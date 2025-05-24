@@ -301,278 +301,68 @@ class ModernFractureDetectionApp:
                                        wraplength=300)
         self.image_info_label.pack(anchor=tk.W, pady=5)
         
-        # Prediction Method Card - Made more prominent
+        # Prediction Method Card
         self.method_card = self.create_card(parent, "⚙️ Analysis Method")
         
         self.method_var = tk.StringVar(value="combined")
         
-        # Single model methods with enhanced styling
+        # Single model methods
         self.single_methods_frame = tk.Frame(self.method_card, bg=self.colors['surface'])
         
         single_methods = [
-            ("🧠 CNN Deep Learning", "cnn", "Neural network-based analysis"),
-            ("📐 Hough Transform", "hough", "Edge detection algorithm"),
-            ("🔀 Combined Analysis", "combined", "CNN + Hough hybrid approach")
+            ("🧠 CNN Deep Learning", "cnn"),
+            ("📐 Hough Transform", "hough"),
+            ("🔀 Combined Analysis", "combined")
         ]
         
-        for text, value, desc in single_methods:
-            # Create container for each method
-            method_container = tk.Frame(self.single_methods_frame, bg=self.colors['surface'])
-            method_container.pack(fill=tk.X, pady=3)
-            
-            rb = tk.Radiobutton(method_container,
+        for text, value in single_methods:
+            rb = tk.Radiobutton(self.single_methods_frame,
                               text=text,
                               variable=self.method_var,
                               value=value,
-                              font=('Segoe UI', 11, 'bold'),
+                              font=('Segoe UI', 10),
                               bg=self.colors['surface'],
                               fg=self.colors['text_primary'],
                               selectcolor=self.colors['accent'],
-                              activebackground=self.colors['surface'],
-                              anchor='w')
-            rb.pack(anchor=tk.W, fill=tk.X)
-            
-            # Add description
-            desc_label = tk.Label(method_container,
-                                text=f"   {desc}",
-                                font=('Segoe UI', 9),
-                                bg=self.colors['surface'],
-                                fg=self.colors['text_secondary'])
-            desc_label.pack(anchor=tk.W, padx=(20, 0))
+                              activebackground=self.colors['surface'])
+            rb.pack(anchor=tk.W, pady=2)
         
-        # Ensemble methods with enhanced styling
+        # Ensemble methods
         self.ensemble_methods_frame = tk.Frame(self.method_card, bg=self.colors['surface'])
         
         self.voting_var = tk.StringVar(value="weighted_average")
         
         ensemble_methods = [
-            ("⚖️ Weighted Average", "weighted_average", "Combines models with importance weights"),
-            ("🗳️ Majority Vote", "majority_vote", "Democratic voting across models"),
-            ("🏆 Max Confidence", "max_confidence", "Selects highest confidence prediction")
+            ("⚖️ Weighted Average", "weighted_average"),
+            ("🗳️ Majority Vote", "majority_vote"),
+            ("🏆 Max Confidence", "max_confidence")
         ]
         
-        for text, value, desc in ensemble_methods:
-            # Create container for each method
-            method_container = tk.Frame(self.ensemble_methods_frame, bg=self.colors['surface'])
-            method_container.pack(fill=tk.X, pady=3)
-            
-            rb = tk.Radiobutton(method_container,
+        for text, value in ensemble_methods:
+            rb = tk.Radiobutton(self.ensemble_methods_frame,
                               text=text,
                               variable=self.voting_var,
                               value=value,
-                              font=('Segoe UI', 11, 'bold'),
+                              font=('Segoe UI', 10),
                               bg=self.colors['surface'],
                               fg=self.colors['text_primary'],
                               selectcolor=self.colors['accent'],
-                              activebackground=self.colors['surface'],
-                              anchor='w')
-            rb.pack(anchor=tk.W, fill=tk.X)
-            
-            # Add description
-            desc_label = tk.Label(method_container,
-                                text=f"   {desc}",
-                                font=('Segoe UI', 9),
-                                bg=self.colors['surface'],
-                                fg=self.colors['text_secondary'])
-            desc_label.pack(anchor=tk.W, padx=(20, 0))
-        # Move Analysis Method Card to be more prominent - place it right after Mode Selection
-        # Remove the create_results_card from here temporarily
+                              activebackground=self.colors['surface'])
+            rb.pack(anchor=tk.W, pady=2)
         
-        # Results Card - moved after method selection for better visibility
-        self.create_results_card(parent)
-
-    def create_control_panel(self, parent):
-        """Create modern control panel with prominent method selection"""
-        # Mode Selection Card
-        mode_card = self.create_card(parent, "🎯 Analysis Mode")
-        
-        mode_frame = tk.Frame(mode_card, bg=self.colors['surface'])
-        mode_frame.pack(fill=tk.X, pady=10)
-        
-        single_rb = tk.Radiobutton(mode_frame,
-                                  text="🔬 Single Model Analysis",
-                                  variable=self.current_mode,
-                                  value="single",
-                                  font=('Segoe UI', 10),
-                                  bg=self.colors['surface'],
-                                  fg=self.colors['text_primary'],
-                                  selectcolor=self.colors['accent'],
-                                  activebackground=self.colors['surface'],
-                                  command=self.on_mode_change)
-        single_rb.pack(anchor=tk.W, pady=2)
-        
-        ensemble_rb = tk.Radiobutton(mode_frame,
-                                   text="🚀 Multi-Region Ensemble",
-                                   variable=self.current_mode,
-                                   value="ensemble",
-                                   font=('Segoe UI', 10),
-                                   bg=self.colors['surface'],
-                                   fg=self.colors['text_primary'],
-                                   selectcolor=self.colors['accent'],
-                                   activebackground=self.colors['surface'],
-                                   command=self.on_mode_change)
-        ensemble_rb.pack(anchor=tk.W, pady=2)
-        
-        # Analysis Method Card - More prominent position and styling
-        self.method_card = self.create_prominent_card(parent, "⚙️ Analysis Method")
-        
-        self.method_var = tk.StringVar(value="combined")
-        
-        # Single model methods with enhanced styling
-        self.single_methods_frame = tk.Frame(self.method_card, bg=self.colors['surface'])
-        
-        single_methods = [
-            ("🧠 CNN Deep Learning", "cnn", "Neural network-based analysis"),
-            ("📐 Hough Transform", "hough", "Edge detection algorithm"),
-            ("🔀 Combined Analysis", "combined", "CNN + Hough hybrid approach")
-        ]
-        
-        for text, value, desc in single_methods:
-            # Create container for each method
-            method_container = tk.Frame(self.single_methods_frame, bg=self.colors['surface'])
-            method_container.pack(fill=tk.X, pady=5)
-            
-            rb = tk.Radiobutton(method_container,
-                              text=text,
-                              variable=self.method_var,
-                              value=value,
-                              font=('Segoe UI', 11, 'bold'),
-                              bg=self.colors['surface'],
-                              fg=self.colors['text_primary'],
-                              selectcolor=self.colors['accent'],
-                              activebackground=self.colors['surface'],
-                              anchor='w')
-            rb.pack(anchor=tk.W, fill=tk.X)
-            
-            # Add description
-            desc_label = tk.Label(method_container,
-                                text=f"   {desc}",
-                                font=('Segoe UI', 9),
-                                bg=self.colors['surface'],
-                                fg=self.colors['text_secondary'])
-            desc_label.pack(anchor=tk.W, padx=(20, 0))
-        
-        # Ensemble methods with enhanced styling
-        self.ensemble_methods_frame = tk.Frame(self.method_card, bg=self.colors['surface'])
-        
-        self.voting_var = tk.StringVar(value="weighted_average")
-        
-        ensemble_methods = [
-            ("⚖️ Weighted Average", "weighted_average", "Combines models with importance weights"),
-            ("🗳️ Majority Vote", "majority_vote", "Democratic voting across models"),
-            ("🏆 Max Confidence", "max_confidence", "Selects highest confidence prediction")
-        ]
-        
-        for text, value, desc in ensemble_methods:
-            # Create container for each method
-            method_container = tk.Frame(self.ensemble_methods_frame, bg=self.colors['surface'])
-            method_container.pack(fill=tk.X, pady=5)
-            
-            rb = tk.Radiobutton(method_container,
-                              text=text,
-                              variable=self.voting_var,
-                              value=value,
-                              font=('Segoe UI', 11, 'bold'),
-                              bg=self.colors['surface'],
-                              fg=self.colors['text_primary'],
-                              selectcolor=self.colors['accent'],
-                              activebackground=self.colors['surface'],
-                              anchor='w')
-            rb.pack(anchor=tk.W, fill=tk.X)
-            
-            # Add description
-            desc_label = tk.Label(method_container,
-                                text=f"   {desc}",
-                                font=('Segoe UI', 9),
-                                bg=self.colors['surface'],
-                                fg=self.colors['text_secondary'])
-            desc_label.pack(anchor=tk.W, padx=(20, 0))
-        
-        # Prediction Button - more prominent
+        # Prediction Button
         self.predict_btn = ttk.Button(self.method_card,
-                                     text="🔍 ANALYZE X-RAY",
+                                     text="🔍 Analyze X-ray",
                                      style='Modern.TButton',
                                      command=self.predict_image,
                                      state=tk.DISABLED)
-        self.predict_btn.pack(fill=tk.X, pady=(20, 10))
+        self.predict_btn.pack(fill=tk.X, pady=(15, 5))
         
-        # Model Selection Card
-        self.model_card = self.create_card(parent, "🤖 Model Configuration")
+        # Update UI based on initial mode (NOW after all frames are created)
+        self.on_mode_change()
         
-        # Model selection buttons
-        btn_frame = tk.Frame(self.model_card, bg=self.colors['surface'])
-        btn_frame.pack(fill=tk.X, pady=10)
-        
-        self.model_btn = ttk.Button(btn_frame, 
-                              text="📦 Select Model",
-                              style='Modern.TButton',
-                              command=self.show_model_menu)
-        self.model_btn.pack(fill=tk.X, pady=(0, 5))
-        
-        self.ensemble_btn = ttk.Button(btn_frame,
-                                     text="🚀 Initialize Ensemble",
-                                     style='Accent.TButton',
-                                     command=self.initialize_ensemble)
-        self.ensemble_btn.pack(fill=tk.X, pady=(5, 0))
-        
-        # Model info display
-        self.model_info_frame = tk.Frame(self.model_card, bg=self.colors['surface'])
-        self.model_info_frame.pack(fill=tk.X, pady=5)
-        
-        self.model_name_label = tk.Label(self.model_info_frame,
-                                        text="Loading model...",
-                                        font=('Segoe UI', 10),
-                                        bg=self.colors['surface'],
-                                        fg=self.colors['text_secondary'])
-        self.model_name_label.pack(anchor=tk.W)
-        
-        self.region_label = tk.Label(self.model_info_frame,
-                                   text="Region: XR_HAND",
-                                   font=('Segoe UI', 10),
-                                   bg=self.colors['surface'],
-                                   fg=self.colors['text_secondary'])
-        self.region_label.pack(anchor=tk.W)
-        
-        # Ensemble info (initially hidden)
-        self.ensemble_info_frame = tk.Frame(self.model_card, bg=self.colors['surface'])
-        
-        self.ensemble_status_label = tk.Label(self.ensemble_info_frame,
-                                            text="Ensemble not initialized",
-                                            font=('Segoe UI', 10),
-                                            bg=self.colors['surface'],
-                                            fg=self.colors['text_secondary'])
-        self.ensemble_status_label.pack(anchor=tk.W)
-        
-        self.ensemble_models_label = tk.Label(self.ensemble_info_frame,
-                                            text="Models: 0",
-                                            font=('Segoe UI', 10),
-                                            bg=self.colors['surface'],
-                                            fg=self.colors['text_secondary'])
-        self.ensemble_models_label.pack(anchor=tk.W)
-        
-        # Progress bar for model loading
-        self.progress_bar = ttk.Progressbar(self.model_card,
-                                          mode='indeterminate',
-                                          length=300)
-        self.progress_bar.pack(fill=tk.X, pady=5)
-        
-        # Image Selection Card
-        image_card = self.create_card(parent, "📁 Image Selection")
-        
-        upload_btn = ttk.Button(image_card,
-                               text="🖼️ Choose X-ray Image",
-                               style='Accent.TButton',
-                               command=self.browse_image)
-        upload_btn.pack(fill=tk.X, pady=10)
-        
-        # Image info
-        self.image_info_label = tk.Label(image_card,
-                                       text="No image selected",
-                                       font=('Segoe UI', 10),
-                                       bg=self.colors['surface'],
-                                       fg=self.colors['text_secondary'],
-                                       wraplength=300)
-        self.image_info_label.pack(anchor=tk.W, pady=5)
+        # Results Card
+        self.create_results_card(parent)
 
     def create_results_card(self, parent):
         """Create modern results display card"""
@@ -694,46 +484,6 @@ class ModernFractureDetectionApp:
         # Card content
         content = tk.Frame(card, bg=self.colors['surface'])
         content.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
-        
-        return content
-
-    def create_prominent_card(self, parent, title):
-        """Create a more prominent card for important sections"""
-        # Card container with enhanced shadow effect
-        card_container = tk.Frame(parent, bg=self.colors['background'])
-        card_container.pack(fill=tk.X, pady=(0, 20))
-        
-        # Enhanced shadow frame
-        shadow_frame = tk.Frame(card_container, bg=self.colors['shadow'], height=3)
-        shadow_frame.pack(fill=tk.X, side=tk.BOTTOM)
-        
-        # Main card with accent border
-        card = tk.Frame(card_container, bg=self.colors['surface'], relief='flat', bd=2, highlightbackground=self.colors['accent'], highlightthickness=1)
-        card.pack(fill=tk.BOTH, expand=True)
-        
-        # Card header with gradient effect
-        header = tk.Frame(card, bg=self.colors['accent'], height=45)
-        header.pack(fill=tk.X)
-        header.pack_propagate(False)
-        
-        title_label = tk.Label(header,
-                             text=title,
-                             font=('Segoe UI', 13, 'bold'),
-                             bg=self.colors['accent'],
-                             fg='white')
-        title_label.pack(side=tk.LEFT, padx=15, pady=12)
-        
-        # Add a small indicator
-        indicator_label = tk.Label(header,
-                                 text="●",
-                                 font=('Segoe UI', 16),
-                                 bg=self.colors['accent'],
-                                 fg='white')
-        indicator_label.pack(side=tk.RIGHT, padx=15, pady=12)
-        
-        # Card content with more padding
-        content = tk.Frame(card, bg=self.colors['surface'])
-        content.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
         return content
 
