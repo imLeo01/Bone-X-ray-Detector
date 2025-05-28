@@ -1,5 +1,5 @@
-# app.py
-# Giao diện người dùng đồ họa hiện đại cho hệ thống phát hiện gãy xương
+# app.py - Updated with Advanced False Positive Reduction
+# Giao diện người dùng đồ họa hiện đại với tích hợp FP Reduction System
 
 import os
 import numpy as np
@@ -11,31 +11,622 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import threading
 import time
+import json
+from datetime import datetime
 
-# Import thêm cho ensemble
-from ensemble_prediction import MultiRegionEnsemble
+# Fix TensorFlow compatibility first
+try:
+    from tensorflow_compatibility_fix import fix_tensorflow_compatibility
+    fix_tensorflow_compatibility()
+except ImportError:
+    print("⚠️ TensorFlow compatibility fix not found, continuing...")
 
-from prediction import FractureDetector
+# Import State-of-the-Art system
+try:
+    from sota import StateOfTheArtFractureDetector
+except ImportError as e:
+    print(f"⚠️ Could not import StateOfTheArtFractureDetector: {e}")
+    StateOfTheArtFractureDetector = None
 
-class ModernFractureDetectionApp:
+# Import ensemble system
+try:
+    from ensemble_prediction import MultiRegionEnsemble
+except ImportError as e:
+    print(f"⚠️ Could not import MultiRegionEnsemble: {e}")
+    MultiRegionEnsemble = None
+
+# Import Advanced FP Reduction System
+try:
+    from advanced_false_positive_reduction import (
+        UncertaintyQuantification,
+        ConfidenceCalibration,
+        HardNegativeMining,
+        AdaptiveThresholding,
+        EnsembleUncertainty,
+        AdvancedFalsePositiveReducer
+    )
+except ImportError as e:
+    print(f"⚠️ Could not import FP Reduction components: {e}")
+    # Create dummy classes
+    class UncertaintyQuantification: pass
+    class ConfidenceCalibration: pass
+    class HardNegativeMining: pass
+    class AdaptiveThresholding: pass
+    class EnsembleUncertainty: pass
+    class AdvancedFalsePositiveReducer: pass
+
+class SOTAHoughTransform:
+    """
+    State-of-the-Art Hough Transform for Fracture Detection
+    Based on latest research: Multi-parameter, YOLO-inspired, Dynamic thresholding
+    """
+    def __init__(self):
+        self.line_orientations = np.arange(0, 180, 15)  # 12 orientations
+        self.debug_mode = True
+        
+    def advanced_edge_detection(self, image):
+        """Advanced multi-scale edge detection"""
+        edges_list = []
+        
+        # 1. Multi-scale Canny edge detection
+        canny_params = [
+            (15, 45),   # Very sensitive
+            (25, 75),   # High sensitivity  
+            (35, 105),  # Medium sensitivity
+            (50, 150),  # Standard
+            (70, 200),  # Conservative
+        ]
+        
+        for low, high in canny_params:
+            edges = cv2.Canny(image, low, high, apertureSize=3)
+            edges_list.append(edges.astype(np.float32) / 255.0)
+        
+        # 2. Sobel edge detection
+        sobelx = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=3)
+        sobely = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=3)
+        sobel_combined = np.sqrt(sobelx**2 + sobely**2)
+        sobel_norm = sobel_combined / (np.max(sobel_combined) + 1e-8)
+        edges_list.append(sobel_norm)
+        
+        # 3. Laplacian edge detection
+        laplacian = cv2.Laplacian(image, cv2.CV_64F)
+        laplacian_norm = np.abs(laplacian) / (np.max(np.abs(laplacian)) + 1e-8)
+        edges_list.append(laplacian_norm)
+        
+        # Weighted combination
+        weights = [0.2, 0.2, 0.15, 0.1, 0.05, 0.15, 0.15]
+        combined = np.zeros_like(edges_list[0])
+        for edge_map, weight in zip(edges_list, weights):
+            combined += edge_map * weight
+        
+        # Non-maximum suppression
+        combined = self._non_maximum_suppression(combined, image)
+        
+        return (combined * 255).astype(np.uint8)
+    
+    def _non_maximum_suppression(self, edge_map, original_image):
+        """Non-maximum suppression for edge thinning"""
+        # Compute gradient direction
+        Ix = cv2.Sobel(original_image, cv2.CV_64F, 1, 0, ksize=3)
+        Iy = cv2.Sobel(original_image, cv2.CV_64F, 0, 1, ksize=3)
+        
+        direction = np.arctan2(Iy, Ix) * 180 / np.pi
+        direction[direction < 0] += 180
+        
+        suppressed = np.zeros_like(edge_map)
+        
+        for i in range(1, edge_map.shape[0] - 1):
+            for j in range(1, edge_map.shape[1] - 1):
+                angle = direction[i, j]
+                
+                # Determine neighbors based on gradient direction
+                if (0 <= angle < 22.5) or (157.5 <= angle <= 180):
+                    neighbors = [edge_map[i, j-1], edge_map[i, j+1]]
+                elif 22.5 <= angle < 67.5:
+                    neighbors = [edge_map[i-1, j-1], edge_map[i+1, j+1]]
+                elif 67.5 <= angle < 112.5:
+                    neighbors = [edge_map[i-1, j], edge_map[i+1, j]]
+                else:
+                    neighbors = [edge_map[i-1, j+1], edge_map[i+1, j-1]]
+                
+                if edge_map[i, j] >= max(neighbors):
+                    suppressed[i, j] = edge_map[i, j]
+        
+        return suppressed
+    
+    def sota_hough_line_detection(self, edges):
+        """SOTA Hough Transform with multiple strategies"""
+        all_lines = []
+        
+        # 1. Multi-parameter Standard Hough Transform
+        hough_configs = [
+            {'rho': 1, 'theta': np.pi/180, 'threshold': 25, 'min_len': 8, 'max_gap': 3},
+            {'rho': 1, 'theta': np.pi/180, 'threshold': 35, 'min_len': 15, 'max_gap': 5},
+            {'rho': 1, 'theta': np.pi/180, 'threshold': 45, 'min_len': 20, 'max_gap': 8},
+            {'rho': 2, 'theta': np.pi/180, 'threshold': 30, 'min_len': 12, 'max_gap': 4},
+            {'rho': 0.5, 'theta': np.pi/360, 'threshold': 20, 'min_len': 10, 'max_gap': 6},
+        ]
+        
+        for config in hough_configs:
+            lines = cv2.HoughLinesP(edges, **config)
+            if lines is not None:
+                all_lines.extend(lines)
+        
+        # 2. Directional Hough for specific fracture angles
+        fracture_angles = [30, 45, 60, 90, 120, 135, 150]
+        for angle_deg in fracture_angles:
+            filtered_edges = self._apply_directional_filter(edges, angle_deg)
+            dir_lines = cv2.HoughLinesP(filtered_edges, 1, np.pi/180, 20, 
+                                      minLineLength=8, maxLineGap=4)
+            if dir_lines is not None:
+                all_lines.extend(dir_lines)
+        
+        # 3. Adaptive threshold Hough
+        adaptive_lines = self._adaptive_threshold_hough(edges)
+        if adaptive_lines is not None:
+            all_lines.extend(adaptive_lines)
+        
+        # 4. Multi-scale Hough
+        multiscale_lines = self._multiscale_hough(edges)
+        if multiscale_lines is not None:
+            all_lines.extend(multiscale_lines)
+        
+        return np.array(all_lines) if all_lines else None
+    
+    def _apply_directional_filter(self, edges, angle_deg):
+        """Apply directional filter for specific angles"""
+        angle_rad = np.deg2rad(angle_deg)
+        
+        # Create directional kernel
+        size = 15
+        kernel = np.zeros((size, size))
+        center = size // 2
+        
+        for i in range(size):
+            for j in range(size):
+                x, y = j - center, i - center
+                dist_to_line = abs(x * np.sin(angle_rad) - y * np.cos(angle_rad))
+                if dist_to_line <= 2.0:
+                    kernel[i, j] = 1.0
+        
+        if np.sum(kernel) > 0:
+            kernel /= np.sum(kernel)
+            filtered = cv2.filter2D(edges, -1, kernel)
+            return filtered
+        
+        return edges
+    
+    def _adaptive_threshold_hough(self, edges):
+        """Adaptive threshold based on image content"""
+        # Calculate optimal threshold based on edge density
+        edge_density = np.sum(edges > 0) / (edges.shape[0] * edges.shape[1])
+        
+        if edge_density > 0.1:  # High edge density
+            threshold = 40
+            min_len = 15
+        elif edge_density > 0.05:  # Medium edge density
+            threshold = 30
+            min_len = 12
+        else:  # Low edge density
+            threshold = 20
+            min_len = 8
+        
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold, 
+                              minLineLength=min_len, maxLineGap=5)
+        return lines
+    
+    def _multiscale_hough(self, edges):
+        """Multi-scale Hough Transform"""
+        all_lines = []
+        
+        # Different scales
+        scales = [0.5, 1.0, 1.5, 2.0]
+        
+        for scale in scales:
+            if scale != 1.0:
+                h, w = edges.shape
+                new_h, new_w = int(h * scale), int(w * scale)
+                scaled_edges = cv2.resize(edges, (new_w, new_h))
+            else:
+                scaled_edges = edges
+            
+            # Scale-adapted parameters
+            threshold = max(15, int(25 / scale))
+            min_len = max(5, int(10 / scale))
+            max_gap = max(2, int(4 / scale))
+            
+            lines = cv2.HoughLinesP(scaled_edges, 1, np.pi/180, threshold,
+                                  minLineLength=min_len, maxLineGap=max_gap)
+            
+            if lines is not None:
+                # Scale lines back to original size
+                if scale != 1.0:
+                    lines = lines / scale
+                all_lines.extend(lines)
+        
+        return all_lines if all_lines else None
+    
+    def analyze_fracture_patterns(self, lines, image_shape):
+        """Advanced fracture pattern analysis"""
+        if lines is None or len(lines) == 0:
+            return {
+                'fracture_score': 0.0,
+                'confidence': 0.0,
+                'pattern_type': 'none',
+                'line_count': 0,
+                'analysis_details': {}
+            }
+        
+        h, w = image_shape[:2]
+        
+        # Flatten lines if needed
+        if len(lines.shape) == 3:
+            lines = lines.reshape(-1, 4)
+        
+        # Extract line features
+        line_features = self._extract_line_features(lines, (h, w))
+        
+        # Multiple analysis modules
+        geometric_analysis = self._geometric_analysis(line_features)
+        medical_analysis = self._medical_pattern_analysis(line_features, (h, w))
+        spatial_analysis = self._spatial_distribution_analysis(line_features, (h, w))
+        
+        # Combine analyses
+        final_score = self._weighted_score_combination([
+            geometric_analysis['score'],
+            medical_analysis['score'],
+            spatial_analysis['score']
+        ], weights=[0.3, 0.5, 0.2])
+        
+        # Calculate confidence based on pattern consistency
+        confidence = np.mean([
+            geometric_analysis.get('consistency', 0.5),
+            medical_analysis.get('consistency', 0.5),
+            spatial_analysis.get('consistency', 0.5)
+        ])
+        
+        # Determine pattern type
+        pattern_type = self._determine_pattern_type(line_features)
+        
+        return {
+            'fracture_score': min(final_score, 1.0),
+            'confidence': confidence,
+            'pattern_type': pattern_type,
+            'line_count': len(lines),
+            'analysis_details': {
+                'geometric': geometric_analysis,
+                'medical': medical_analysis,
+                'spatial': spatial_analysis
+            }
+        }
+    
+    def _extract_line_features(self, lines, image_shape):
+        """Extract comprehensive line features"""
+        h, w = image_shape
+        features = []
+        
+        for line in lines:
+            x1, y1, x2, y2 = line
+            
+            # Basic geometric features
+            length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
+            if angle < 0:
+                angle += 180
+            
+            mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
+            
+            # Advanced features
+            center_x, center_y = w // 2, h // 2
+            dist_to_center = np.sqrt((mid_x - center_x)**2 + (mid_y - center_y)**2)
+            
+            # Orientation analysis
+            angle_to_horizontal = min(abs(angle), abs(angle - 180))
+            angle_to_vertical = min(abs(angle - 90), abs(angle - 270))
+            
+            # Medical relevance
+            is_transverse = 80 <= angle_to_vertical <= 100
+            is_oblique = 30 <= angle_to_horizontal <= 60
+            is_longitudinal = angle_to_horizontal <= 20 or angle_to_horizontal >= 160
+            
+            features.append({
+                'coords': (x1, y1, x2, y2),
+                'length': length,
+                'angle': angle,
+                'midpoint': (mid_x, mid_y),
+                'dist_to_center': dist_to_center,
+                'angle_to_horizontal': angle_to_horizontal,
+                'angle_to_vertical': angle_to_vertical,
+                'is_transverse': is_transverse,
+                'is_oblique': is_oblique,
+                'is_longitudinal': is_longitudinal
+            })
+        
+        return features
+    
+    def _geometric_analysis(self, line_features):
+        """Analyze geometric properties"""
+        if not line_features:
+            return {'score': 0.0, 'consistency': 0.0}
+        
+        scores = []
+        
+        # Length distribution analysis
+        lengths = [f['length'] for f in line_features]
+        length_std = np.std(lengths)
+        length_mean = np.mean(lengths)
+        
+        # Short lines indicate fragmentation
+        short_lines = [f for f in line_features if f['length'] < 25]
+        if len(short_lines) > 3:
+            scores.append(min(len(short_lines) / 10, 1.0))
+        
+        # Length variability
+        if length_mean > 0:
+            length_cv = length_std / length_mean
+            if length_cv > 0.5:
+                scores.append(min(length_cv, 1.0))
+        
+        # Angle diversity
+        angles = [f['angle'] for f in line_features]
+        angle_std = np.std(angles)
+        if 15 < angle_std < 60:  # Moderate diversity
+            scores.append(0.7)
+        elif angle_std >= 60:  # High diversity
+            scores.append(0.9)
+        
+        final_score = np.mean(scores) if scores else 0.0
+        consistency = 1 - np.std(scores) / (np.mean(scores) + 1e-8) if len(scores) > 1 else 1.0
+        
+        return {
+            'score': final_score,
+            'consistency': max(0, consistency)
+        }
+    
+    def _medical_pattern_analysis(self, line_features, image_shape):
+        """Medical knowledge-based analysis"""
+        h, w = image_shape
+        scores = []
+        
+        # Transverse fracture detection (most common)
+        transverse_lines = [f for f in line_features if f['is_transverse']]
+        if transverse_lines:
+            scores.append(min(len(transverse_lines) / 3, 1.0) * 0.9)
+        
+        # Oblique fracture detection
+        oblique_lines = [f for f in line_features if f['is_oblique']]
+        if oblique_lines:
+            scores.append(min(len(oblique_lines) / 4, 1.0) * 0.8)
+        
+        # Longitudinal fracture detection (less common)
+        longitudinal_lines = [f for f in line_features if f['is_longitudinal']]
+        if longitudinal_lines:
+            scores.append(min(len(longitudinal_lines) / 2, 1.0) * 0.6)
+        
+        # Comminuted fracture (multiple fragments)
+        if len(line_features) > 8:
+            small_fragments = [f for f in line_features if f['length'] < 20]
+            if len(small_fragments) > 5:
+                scores.append(min(len(small_fragments) / 12, 1.0) * 0.95)
+        
+        # Central location preference
+        central_lines = [f for f in line_features 
+                        if f['dist_to_center'] < min(w, h) * 0.3]
+        if central_lines:
+            scores.append(min(len(central_lines) / len(line_features), 1.0) * 0.7)
+        
+        final_score = np.mean(scores) if scores else 0.0
+        consistency = 1.0 if scores else 0.0
+        
+        return {
+            'score': final_score,
+            'consistency': consistency
+        }
+    
+    def _spatial_distribution_analysis(self, line_features, image_shape):
+        """Analyze spatial distribution"""
+        if not line_features:
+            return {'score': 0.0, 'consistency': 0.0}
+        
+        h, w = image_shape
+        scores = []
+        
+        # Clustering analysis
+        positions = [f['midpoint'] for f in line_features]
+        if len(positions) >= 3:
+            cluster_score = self._analyze_spatial_clustering(positions)
+            if cluster_score > 0.4:
+                scores.append(cluster_score)
+        
+        # Density analysis
+        grid_size = 8
+        density_grid = np.zeros((grid_size, grid_size))
+        
+        for x, y in positions:
+            grid_x = min(int(x / (w / grid_size)), grid_size - 1)
+            grid_y = min(int(y / (h / grid_size)), grid_size - 1)
+            density_grid[grid_y, grid_x] += 1
+        
+        max_density = np.max(density_grid)
+        if max_density > 2:
+            high_density_cells = np.sum(density_grid >= max_density * 0.7)
+            if high_density_cells <= 3:
+                scores.append(min(max_density / 6, 1.0))
+        
+        final_score = np.mean(scores) if scores else 0.0
+        consistency = 1.0 if scores else 0.0
+        
+        return {
+            'score': final_score,
+            'consistency': consistency
+        }
+    
+    def _analyze_spatial_clustering(self, positions):
+        """Analyze spatial clustering of positions"""
+        if len(positions) < 3:
+            return 0.0
+        
+        positions = np.array(positions)
+        
+        # Calculate pairwise distances
+        from scipy.spatial.distance import pdist
+        distances = pdist(positions)
+        
+        # Clustering score based on distance distribution
+        median_dist = np.median(distances)
+        close_pairs = np.sum(distances < median_dist * 0.5)
+        total_pairs = len(distances)
+        
+        return close_pairs / total_pairs
+    
+    def _weighted_score_combination(self, scores, weights):
+        """Combine scores with weights"""
+        if not scores:
+            return 0.0
+        
+        weights = np.array(weights)
+        weights = weights / np.sum(weights)  # Normalize
+        
+        combined = np.sum(np.array(scores) * weights)
+        
+        # Apply enhancement function
+        enhanced = 1 / (1 + np.exp(-4 * (combined - 0.5)))
+        
+        return min(enhanced, 1.0)
+    
+    def _determine_pattern_type(self, line_features):
+        """Determine fracture pattern type"""
+        if not line_features:
+            return 'none'
+        
+        transverse_count = sum(1 for f in line_features if f['is_transverse'])
+        oblique_count = sum(1 for f in line_features if f['is_oblique'])
+        longitudinal_count = sum(1 for f in line_features if f['is_longitudinal'])
+        
+        if len(line_features) > 8:
+            return 'comminuted'
+        elif transverse_count > oblique_count and transverse_count > longitudinal_count:
+            return 'transverse'
+        elif oblique_count > transverse_count and oblique_count > longitudinal_count:
+            return 'oblique'
+        elif longitudinal_count > 0:
+            return 'longitudinal'
+        else:
+            return 'complex'
+    
+    def predict_fracture(self, image):
+        """Main prediction method for SOTA Hough"""
+        try:
+            # Advanced edge detection
+            edges = self.advanced_edge_detection(image)
+            
+            # SOTA Hough line detection
+            lines = self.sota_hough_line_detection(edges)
+            
+            # Pattern analysis
+            analysis = self.analyze_fracture_patterns(lines, image.shape)
+            
+            # Create visualization heatmap
+            heatmap = self._create_hough_heatmap(image, lines, analysis)
+            
+            return analysis['fracture_score'], heatmap, analysis
+            
+        except Exception as e:
+            print(f"SOTA Hough prediction error: {e}")
+            return 0.0, np.zeros_like(image, dtype=np.float32), {
+                'fracture_score': 0.0,
+                'confidence': 0.0,
+                'pattern_type': 'error',
+                'line_count': 0,
+                'analysis_details': {}
+            }
+    
+    def _create_hough_heatmap(self, image, lines, analysis):
+        """Create advanced heatmap from Hough analysis"""
+        h, w = image.shape[:2]
+        heatmap = np.zeros((h, w), dtype=np.float32)
+        
+        if lines is None or len(lines) == 0:
+            return heatmap
+        
+        # Flatten lines if needed
+        if len(lines.shape) == 3:
+            lines = lines.reshape(-1, 4)
+        
+        fracture_score = analysis['fracture_score']
+        confidence = analysis['confidence']
+        
+        # Draw lines with intensity based on medical relevance
+        for line in lines:
+            x1, y1, x2, y2 = [int(coord) for coord in line]
+            x1, y1 = max(0, min(w-1, x1)), max(0, min(h-1, y1))
+            x2, y2 = max(0, min(w-1, x2)), max(0, min(h-1, y2))
+            
+            # Calculate line properties
+            length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
+            if angle < 0:
+                angle += 180
+            
+            # Medical relevance weighting
+            angle_to_vertical = min(abs(angle - 90), abs(angle - 270))
+            if 80 <= angle_to_vertical <= 100:  # Transverse
+                intensity = 0.9
+                thickness = 8
+            elif 30 <= angle <= 60 or 120 <= angle <= 150:  # Oblique
+                intensity = 0.7
+                thickness = 6
+            else:  # Other orientations
+                intensity = 0.5
+                thickness = 4
+            
+            # Length-based adjustment
+            if length < 15:
+                intensity *= 1.2  # Small fragments more suspicious
+                thickness += 2
+            elif length > 50:
+                intensity *= 0.8  # Very long lines less likely fractures
+            
+            # Apply confidence modulation
+            intensity *= confidence
+            
+            cv2.line(heatmap, (x1, y1), (x2, y2), intensity, thickness)
+        
+        # Apply Gaussian smoothing
+        sigma = max(2, min(h, w) // 150)
+        heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigma)
+        
+        # Enhance based on overall fracture score
+        heatmap *= (0.3 + 0.7 * fracture_score)
+        
+        # Final normalization
+        if np.max(heatmap) > 0:
+            heatmap = heatmap / np.max(heatmap)
+        
+        return np.clip(heatmap, 0, 1)
+
+class AdvancedFractureDetectionApp:
     def __init__(self, master):
         self.master = master
-        self.master.title("AI Bone Fracture Detection System")
-        self.master.geometry("1400x900")
-        self.master.minsize(1300, 800)
+        self.master.title("🚀 Advanced AI Fracture Detection with FP Reduction")
+        self.master.geometry("1600x1000")
+        self.master.minsize(1500, 900)
         
-        # Modern color scheme
+        # Enhanced color scheme
         self.colors = {
-            'primary': '#2E86AB',      # Blue
-            'secondary': '#A23B72',    # Pink
-            'accent': '#F18F01',       # Orange
-            'success': '#C73E1D',      # Red for fracture detection
-            'background': '#F5F7FA',   # Light gray
+            'primary': '#1E3A8A',      # Deep Blue
+            'secondary': '#7C3AED',    # Purple
+            'accent': '#F59E0B',       # Amber
+            'success': '#DC2626',      # Red for fracture detection
+            'sota': '#10B981',         # Emerald for SOTA features
+            'fp_reduction': '#8B5CF6', # Purple for FP Reduction
+            'confidence': '#06B6D4',   # Cyan for confidence
+            'background': '#F8FAFC',   # Light gray
             'surface': '#FFFFFF',      # White
-            'text_primary': '#2D3748', # Dark gray
-            'text_secondary': '#718096', # Medium gray
-            'border': '#E2E8F0',       # Light border
-            'shadow': '#CBD5E0'        # Shadow color
+            'text_primary': '#1F2937', # Dark gray
+            'text_secondary': '#6B7280', # Medium gray
+            'border': '#E5E7EB',       # Light border
+            'shadow': '#D1D5DB'        # Shadow color
         }
         
         self.master.configure(bg=self.colors['background'])
@@ -46,36 +637,90 @@ class ModernFractureDetectionApp:
         # Variables
         self.current_image_path = None
         self.prediction_result = None
-        self.detector = None
-        self.ensemble = None  # Ensemble system
+        self.sota_detector = None
+        self.sota_hough = None
+        self.ensemble = None
+        self.fp_reducer = None
         self.model_loaded = False
-        self.ensemble_loaded = False  # Ensemble status
+        self.ensemble_loaded = False
+        self.hough_initialized = False
+        self.fp_reduction_enabled = tk.BooleanVar(value=True)
         self.load_model_thread = None
         self.selected_model = tk.StringVar(value="resnet50v2")
         self.progress_var = tk.DoubleVar()
-        self.current_mode = tk.StringVar(value="single")  # "single" hoặc "ensemble"
+        self.current_mode = tk.StringVar(value="sota_fp")  # "sota", "ensemble", "sota_fp"
+        
+        # FP Reduction settings
+        self.target_specificity = tk.DoubleVar(value=0.95)
+        self.confidence_threshold = tk.DoubleVar(value=0.8)
+        self.mc_samples = tk.IntVar(value=30)
         
         # Create modern interface
         self.create_modern_interface()
         
-        # Load default model
-        self.load_model_async()
+        # Load default SOTA model (SOTA Hough will be initialized manually)
+        self.load_sota_model_async()
 
     def setup_styles(self):
-        """Setup modern styling for ttk widgets"""
+        """Setup modern styling with FP Reduction theme"""
         self.style = ttk.Style()
         self.style.theme_use('clam')
         
-        # Configure modern button style
-        self.style.configure('Modern.TButton',
+        # FP Reduction Button style
+        self.style.configure('FPReduction.TButton',
                            font=('Segoe UI', 10, 'bold'),
                            padding=(20, 12),
                            borderwidth=0,
                            focuscolor='none')
         
-        self.style.map('Modern.TButton',
+        self.style.map('FPReduction.TButton',
+                      background=[('active', self.colors['fp_reduction']),
+                                ('pressed', '#7C3AED'),
+                                ('!active', self.colors['fp_reduction'])],
+                      foreground=[('active', 'white'),
+                                ('pressed', 'white'),
+                                ('!active', 'white')])
+        
+        # Confidence Button style
+        self.style.configure('Confidence.TButton',
+                           font=('Segoe UI', 10, 'bold'),
+                           padding=(15, 10),
+                           borderwidth=0,
+                           focuscolor='none')
+        
+        self.style.map('Confidence.TButton',
+                      background=[('active', self.colors['confidence']),
+                                ('pressed', '#0891B2'),
+                                ('!active', self.colors['confidence'])],
+                      foreground=[('active', 'white'),
+                                ('pressed', 'white'),
+                                ('!active', 'white')])
+        
+        # SOTA Button style
+        self.style.configure('SOTA.TButton',
+                           font=('Segoe UI', 10, 'bold'),
+                           padding=(20, 12),
+                           borderwidth=0,
+                           focuscolor='none')
+        
+        self.style.map('SOTA.TButton',
+                      background=[('active', self.colors['sota']),
+                                ('pressed', '#059669'),
+                                ('!active', self.colors['sota'])],
+                      foreground=[('active', 'white'),
+                                ('pressed', 'white'),
+                                ('!active', 'white')])
+        
+        # Primary button
+        self.style.configure('Primary.TButton',
+                           font=('Segoe UI', 10, 'bold'),
+                           padding=(20, 12),
+                           borderwidth=0,
+                           focuscolor='none')
+        
+        self.style.map('Primary.TButton',
                       background=[('active', self.colors['primary']),
-                                ('pressed', '#1A365D'),
+                                ('pressed', '#1E40AF'),
                                 ('!active', self.colors['primary'])],
                       foreground=[('active', 'white'),
                                 ('pressed', 'white'),
@@ -90,46 +735,14 @@ class ModernFractureDetectionApp:
         
         self.style.map('Accent.TButton',
                       background=[('active', self.colors['accent']),
-                                ('pressed', '#E07A00'),
+                                ('pressed', '#D97706'),
                                 ('!active', self.colors['accent'])],
                       foreground=[('active', 'white'),
                                 ('pressed', 'white'),
                                 ('!active', 'white')])
-        
-        # Modern frame style
-        self.style.configure('Card.TFrame',
-                           background=self.colors['surface'],
-                           borderwidth=1,
-                           relief='flat')
-        
-        # Modern label styles
-        self.style.configure('Title.TLabel',
-                           font=('Segoe UI', 24, 'bold'),
-                           background=self.colors['background'],
-                           foreground=self.colors['text_primary'])
-        
-        self.style.configure('Subtitle.TLabel',
-                           font=('Segoe UI', 14),
-                           background=self.colors['surface'],
-                           foreground=self.colors['text_secondary'])
-        
-        self.style.configure('Result.TLabel',
-                           font=('Segoe UI', 12, 'bold'),
-                           background=self.colors['surface'],
-                           foreground=self.colors['text_primary'])
-        
-        self.style.configure('Success.TLabel',
-                           font=('Segoe UI', 14, 'bold'),
-                           background=self.colors['surface'],
-                           foreground=self.colors['success'])
-        
-        self.style.configure('Normal.TLabel',
-                           font=('Segoe UI', 14, 'bold'),
-                           background=self.colors['surface'],
-                           foreground=self.colors['primary'])
 
     def create_modern_interface(self):
-        """Create modern, beautiful interface"""
+        """Create Advanced interface with FP Reduction"""
         # Main container with padding
         main_container = tk.Frame(self.master, bg=self.colors['background'])
         main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
@@ -141,78 +754,164 @@ class ModernFractureDetectionApp:
         content_frame = tk.Frame(main_container, bg=self.colors['background'])
         content_frame.pack(fill=tk.BOTH, expand=True, pady=(20, 0))
         
-        # Left panel (controls and info)
-        left_panel = tk.Frame(content_frame, bg=self.colors['background'], width=350)
-        left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 20))
-        left_panel.pack_propagate(False)
+        # Left panel (controls and info) - WITH SCROLLBARS
+        self.create_scrollable_left_panel(content_frame)
         
         # Right panel (image display)
         right_panel = tk.Frame(content_frame, bg=self.colors['background'])
         right_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         # Create panels content
-        self.create_control_panel(left_panel)
         self.create_image_panel(right_panel)
         
         # Footer with status
         self.create_footer(main_container)
 
     def create_header(self, parent):
-        """Create modern header with title and subtitle"""
+        """Create Advanced header with FP Reduction"""
         header_frame = tk.Frame(parent, bg=self.colors['background'])
         header_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # Title with icon effect
+        # Title with Advanced styling
         title_frame = tk.Frame(header_frame, bg=self.colors['background'])
         title_frame.pack(fill=tk.X)
         
-        # Create a modern title with gradient effect simulation
-        title_label = ttk.Label(title_frame, 
-                               text="🔬 AI Bone Fracture Detection",
-                               style='Title.TLabel')
+        # Advanced title
+        title_label = tk.Label(title_frame, 
+                              text="🚀 Advanced AI Fracture Detection + FP Reduction",
+                              font=('Segoe UI', 24, 'bold'),
+                              bg=self.colors['background'],
+                              fg=self.colors['primary'])
         title_label.pack(side=tk.LEFT)
         
-        # Version badge
-        version_frame = tk.Frame(title_frame, bg=self.colors['accent'], relief='flat')
-        version_frame.pack(side=tk.RIGHT, padx=(10, 0))
+        # Version badges
+        badges_frame = tk.Frame(title_frame, bg=self.colors['background'])
+        badges_frame.pack(side=tk.RIGHT, padx=(10, 0))
         
-        version_label = tk.Label(version_frame, 
-                               text=" v2.0 ",
-                               font=('Segoe UI', 10, 'bold'),
-                               bg=self.colors['accent'],
-                               fg='white')
-        version_label.pack(padx=8, pady=4)
+        # SOTA badge
+        sota_badge = tk.Frame(badges_frame, bg=self.colors['sota'], relief='flat')
+        sota_badge.pack(side=tk.LEFT, padx=(0, 5))
         
-        # Subtitle
+        sota_label = tk.Label(sota_badge, 
+                             text=" SOTA v4.0 ",
+                             font=('Segoe UI', 9, 'bold'),
+                             bg=self.colors['sota'],
+                             fg='white')
+        sota_label.pack(padx=6, pady=3)
+        
+        # FP Reduction badge
+        fp_badge = tk.Frame(badges_frame, bg=self.colors['fp_reduction'], relief='flat')
+        fp_badge.pack(side=tk.LEFT)
+        
+        fp_label = tk.Label(fp_badge, 
+                           text=" FP-REDUCE ",
+                           font=('Segoe UI', 9, 'bold'),
+                           bg=self.colors['fp_reduction'],
+                           fg='white')
+        fp_label.pack(padx=6, pady=3)
+        
+        # Enhanced subtitle
         subtitle_label = tk.Label(header_frame,
-                                text="Advanced Computer Vision System for Medical Image Analysis",
-                                font=('Segoe UI', 12),
+                                text="🔬 Uncertainty Quantification • Confidence Calibration • Hard Negative Mining • SOTA Hough Transform",
+                                font=('Segoe UI', 11),
                                 bg=self.colors['background'],
                                 fg=self.colors['text_secondary'])
         subtitle_label.pack(anchor=tk.W, pady=(5, 0))
 
+    def create_scrollable_left_panel(self, parent):
+        """Create scrollable left panel with both scrollbars"""
+        # Container for the left panel with fixed width
+        left_panel_container = tk.Frame(parent, bg=self.colors['background'], width=400)
+        left_panel_container.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 20))
+        left_panel_container.pack_propagate(False)
+        
+        # Create Canvas and Scrollbars (both vertical and horizontal)
+        canvas = tk.Canvas(left_panel_container, 
+                          bg=self.colors['background'],
+                          highlightthickness=0,
+                          width=380)
+        
+        # Vertical scrollbar
+        v_scrollbar = ttk.Scrollbar(left_panel_container, orient="vertical", command=canvas.yview)
+        
+        # Horizontal scrollbar
+        h_scrollbar = ttk.Scrollbar(left_panel_container, orient="horizontal", command=canvas.xview)
+        
+        self.scrollable_frame = tk.Frame(canvas, bg=self.colors['background'])
+        
+        # Configure scrolling
+        def configure_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        self.scrollable_frame.bind("<Configure>", configure_scroll_region)
+        
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        
+        # Pack canvas and scrollbars
+        canvas.grid(row=0, column=0, sticky="nsew")
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
+        
+        # Configure grid weights
+        left_panel_container.grid_rowconfigure(0, weight=1)
+        left_panel_container.grid_columnconfigure(0, weight=1)
+        
+        # Bind mousewheel to canvas
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def _on_horizontal_mousewheel(event):
+            canvas.xview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def _bind_to_mousewheel(event):
+            canvas.bind_all("<MouseWheel>", _on_mousewheel)
+            canvas.bind_all("<Shift-MouseWheel>", _on_horizontal_mousewheel)
+        
+        def _unbind_from_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+            canvas.unbind_all("<Shift-MouseWheel>")
+        
+        canvas.bind('<Enter>', _bind_to_mousewheel)
+        canvas.bind('<Leave>', _unbind_from_mousewheel)
+        
+        # Create control panel content
+        self.create_control_panel(self.scrollable_frame)
+
     def create_control_panel(self, parent):
-        """Create modern control panel"""
-        # Mode Selection Card (NEW)
-        mode_card = self.create_card(parent, "🎯 Analysis Mode")
+        """Create Advanced control panel with FP Reduction"""
+        # Mode Selection Card with FP Reduction
+        mode_card = self.create_card(parent, "🎯 Advanced Analysis Mode")
         
         mode_frame = tk.Frame(mode_card, bg=self.colors['surface'])
         mode_frame.pack(fill=tk.X, pady=10)
         
-        single_rb = tk.Radiobutton(mode_frame,
-                                  text="🔬 Single Model Analysis",
-                                  variable=self.current_mode,
-                                  value="single",
-                                  font=('Segoe UI', 10),
-                                  bg=self.colors['surface'],
-                                  fg=self.colors['text_primary'],
-                                  selectcolor=self.colors['accent'],
-                                  activebackground=self.colors['surface'],
-                                  command=self.on_mode_change)
-        single_rb.pack(anchor=tk.W, pady=2)
+        sota_fp_rb = tk.Radiobutton(mode_frame,
+                                   text="🚀 SOTA + FP Reduction (Recommended)",
+                                   variable=self.current_mode,
+                                   value="sota_fp",
+                                   font=('Segoe UI', 11, 'bold'),
+                                   bg=self.colors['surface'],
+                                   fg=self.colors['fp_reduction'],
+                                   selectcolor=self.colors['fp_reduction'],
+                                   activebackground=self.colors['surface'],
+                                   command=self.on_mode_change)
+        sota_fp_rb.pack(anchor=tk.W, pady=2)
+        
+        sota_rb = tk.Radiobutton(mode_frame,
+                                text="🔬 SOTA Analysis Only",
+                                variable=self.current_mode,
+                                value="sota",
+                                font=('Segoe UI', 10),
+                                bg=self.colors['surface'],
+                                fg=self.colors['sota'],
+                                selectcolor=self.colors['sota'],
+                                activebackground=self.colors['surface'],
+                                command=self.on_mode_change)
+        sota_rb.pack(anchor=tk.W, pady=2)
         
         ensemble_rb = tk.Radiobutton(mode_frame,
-                                   text="🚀 Multi-Region Ensemble",
+                                   text="🔗 Multi-Region Ensemble",
                                    variable=self.current_mode,
                                    value="ensemble",
                                    font=('Segoe UI', 10),
@@ -223,64 +922,98 @@ class ModernFractureDetectionApp:
                                    command=self.on_mode_change)
         ensemble_rb.pack(anchor=tk.W, pady=2)
         
-        # Model Selection Card
-        self.model_card = self.create_card(parent, "🤖 Model Configuration")
+        # FP Reduction Configuration Card
+        self.fp_config_card = self.create_card(parent, "🛡️ False Positive Reduction Settings")
+        
+        # FP Reduction toggle
+        fp_toggle_frame = tk.Frame(self.fp_config_card, bg=self.colors['surface'])
+        fp_toggle_frame.pack(fill=tk.X, pady=5)
+        
+        fp_check = tk.Checkbutton(fp_toggle_frame,
+                                 text="Enable Advanced FP Reduction",
+                                 variable=self.fp_reduction_enabled,
+                                 font=('Segoe UI', 11, 'bold'),
+                                 bg=self.colors['surface'],
+                                 fg=self.colors['fp_reduction'],
+                                 selectcolor=self.colors['fp_reduction'],
+                                 activebackground=self.colors['surface'],
+                                 command=self.on_fp_toggle)
+        fp_check.pack(anchor=tk.W)
+        
+        # Target Specificity
+        spec_frame = tk.Frame(self.fp_config_card, bg=self.colors['surface'])
+        spec_frame.pack(fill=tk.X, pady=5)
+        
+        tk.Label(spec_frame, text="Target Specificity:",
+                font=('Segoe UI', 10, 'bold'),
+                bg=self.colors['surface'],
+                fg=self.colors['text_primary']).pack(anchor=tk.W)
+        
+        spec_scale = tk.Scale(spec_frame, from_=0.8, to=0.99, resolution=0.01,
+                             orient=tk.HORIZONTAL, variable=self.target_specificity,
+                             bg=self.colors['surface'], fg=self.colors['text_primary'])
+        spec_scale.pack(fill=tk.X, padx=10)
+        
+        # Model Configuration Card
+        model_card = self.create_card(parent, "🔬 Model Configuration")
         
         # Model selection buttons
-        btn_frame = tk.Frame(self.model_card, bg=self.colors['surface'])
+        btn_frame = tk.Frame(model_card, bg=self.colors['surface'])
         btn_frame.pack(fill=tk.X, pady=10)
         
-        self.model_btn = ttk.Button(btn_frame, 
-                              text="📦 Select Model",
-                              style='Modern.TButton',
-                              command=self.show_model_menu)
-        self.model_btn.pack(fill=tk.X, pady=(0, 5))
+        self.sota_model_btn = ttk.Button(btn_frame, 
+                                        text="🧠 Select SOTA Model",
+                                        style='SOTA.TButton',
+                                        command=self.show_sota_model_menu)
+        self.sota_model_btn.pack(fill=tk.X, pady=(0, 5))
         
         self.ensemble_btn = ttk.Button(btn_frame,
-                                     text="🚀 Initialize Ensemble",
+                                     text="🔗 Initialize Ensemble",
                                      style='Accent.TButton',
                                      command=self.initialize_ensemble)
         self.ensemble_btn.pack(fill=tk.X, pady=(5, 0))
         
+        self.fp_init_btn = ttk.Button(btn_frame,
+                                     text="🛡️ Initialize FP Reducer",
+                                     style='FPReduction.TButton',
+                                     command=self.initialize_fp_reducer)
+        self.fp_init_btn.pack(fill=tk.X, pady=(5, 0))
+        
+        self.hough_init_btn = ttk.Button(btn_frame,
+                                       text="📐 Initialize SOTA Hough",
+                                       style='Confidence.TButton',
+                                       command=self.initialize_sota_hough)
+        self.hough_init_btn.pack(fill=tk.X, pady=(5, 0))
+        
         # Model info display
-        self.model_info_frame = tk.Frame(self.model_card, bg=self.colors['surface'])
+        self.model_info_frame = tk.Frame(model_card, bg=self.colors['surface'])
         self.model_info_frame.pack(fill=tk.X, pady=5)
         
-        self.model_name_label = tk.Label(self.model_info_frame,
-                                        text="Loading model...",
-                                        font=('Segoe UI', 10),
-                                        bg=self.colors['surface'],
-                                        fg=self.colors['text_secondary'])
-        self.model_name_label.pack(anchor=tk.W)
+        self.model_status_label = tk.Label(self.model_info_frame,
+                                          text="Loading SOTA model...",
+                                          font=('Segoe UI', 10),
+                                          bg=self.colors['surface'],
+                                          fg=self.colors['text_secondary'])
+        self.model_status_label.pack(anchor=tk.W)
         
-        self.region_label = tk.Label(self.model_info_frame,
-                                   text="Region: XR_HAND",
-                                   font=('Segoe UI', 10),
-                                   bg=self.colors['surface'],
-                                   fg=self.colors['text_secondary'])
-        self.region_label.pack(anchor=tk.W)
+        self.fp_status_label = tk.Label(self.model_info_frame,
+                                       text="FP Reducer not initialized",
+                                       font=('Segoe UI', 10),
+                                       bg=self.colors['surface'],
+                                       fg=self.colors['text_secondary'])
+        self.fp_status_label.pack(anchor=tk.W)
         
-        # Ensemble info (initially hidden)
-        self.ensemble_info_frame = tk.Frame(self.model_card, bg=self.colors['surface'])
+        self.hough_status_label = tk.Label(self.model_info_frame,
+                                         text="SOTA Hough not initialized",
+                                         font=('Segoe UI', 10),
+                                         bg=self.colors['surface'],
+                                         fg=self.colors['text_secondary'])
+        self.hough_status_label.pack(anchor=tk.W)
         
-        self.ensemble_status_label = tk.Label(self.ensemble_info_frame,
-                                            text="Ensemble not initialized",
-                                            font=('Segoe UI', 10),
-                                            bg=self.colors['surface'],
-                                            fg=self.colors['text_secondary'])
-        self.ensemble_status_label.pack(anchor=tk.W)
-        
-        self.ensemble_models_label = tk.Label(self.ensemble_info_frame,
-                                            text="Models: 0",
-                                            font=('Segoe UI', 10),
-                                            bg=self.colors['surface'],
-                                            fg=self.colors['text_secondary'])
-        self.ensemble_models_label.pack(anchor=tk.W)
-        
-        # Progress bar for model loading
-        self.progress_bar = ttk.Progressbar(self.model_card,
+        # Progress bar
+        self.progress_bar = ttk.Progressbar(model_card,
                                           mode='indeterminate',
-                                          length=300)
+                                          length=360)
         self.progress_bar.pack(fill=tk.X, pady=5)
         
         # Image Selection Card
@@ -288,7 +1021,7 @@ class ModernFractureDetectionApp:
         
         upload_btn = ttk.Button(image_card,
                                text="🖼️ Choose X-ray Image",
-                               style='Accent.TButton',
+                               style='Primary.TButton',
                                command=self.browse_image)
         upload_btn.pack(fill=tk.X, pady=10)
         
@@ -298,146 +1031,130 @@ class ModernFractureDetectionApp:
                                        font=('Segoe UI', 10),
                                        bg=self.colors['surface'],
                                        fg=self.colors['text_secondary'],
-                                       wraplength=300)
+                                       wraplength=340)
         self.image_info_label.pack(anchor=tk.W, pady=5)
         
-        # Prediction Method Card
+        # Analysis Methods Card
         self.method_card = self.create_card(parent, "⚙️ Analysis Method")
         
-        self.method_var = tk.StringVar(value="combined")
+        self.method_var = tk.StringVar(value="sota_combined_fp")
         
-        # Single model methods
-        self.single_methods_frame = tk.Frame(self.method_card, bg=self.colors['surface'])
+        # SOTA methods
+        self.sota_methods_frame = tk.Frame(self.method_card, bg=self.colors['surface'])
         
-        single_methods = [
-            ("🧠 CNN Deep Learning", "cnn"),
-            ("📐 Hough Transform", "hough"),
-            ("🔀 Combined Analysis", "combined")
+        sota_methods = [
+            ("🧠 SOTA CNN + FP Reduction", "sota_cnn_fp"),
+            ("📐 SOTA Hough + FP Reduction", "sota_hough_fp"),
+            ("🚀 SOTA Combined + FP Reduction", "sota_combined_fp"),
+            ("🔬 SOTA Hough Analysis Only", "sota_hough_only")
         ]
         
-        for text, value in single_methods:
-            rb = tk.Radiobutton(self.single_methods_frame,
+        for text, value in sota_methods:
+            rb = tk.Radiobutton(self.sota_methods_frame,
                               text=text,
                               variable=self.method_var,
                               value=value,
                               font=('Segoe UI', 10),
                               bg=self.colors['surface'],
                               fg=self.colors['text_primary'],
-                              selectcolor=self.colors['accent'],
+                              selectcolor=self.colors['fp_reduction'],
                               activebackground=self.colors['surface'])
             rb.pack(anchor=tk.W, pady=2)
         
-        # Ensemble methods
-        self.ensemble_methods_frame = tk.Frame(self.method_card, bg=self.colors['surface'])
-        
-        self.voting_var = tk.StringVar(value="weighted_average")
-        
-        ensemble_methods = [
-            ("⚖️ Weighted Average", "weighted_average"),
-            ("🗳️ Majority Vote", "majority_vote"),
-            ("🏆 Max Confidence", "max_confidence")
-        ]
-        
-        for text, value in ensemble_methods:
-            rb = tk.Radiobutton(self.ensemble_methods_frame,
-                              text=text,
-                              variable=self.voting_var,
-                              value=value,
-                              font=('Segoe UI', 10),
-                              bg=self.colors['surface'],
-                              fg=self.colors['text_primary'],
-                              selectcolor=self.colors['accent'],
-                              activebackground=self.colors['surface'])
-            rb.pack(anchor=tk.W, pady=2)
-        
-        # Prediction Button
+        # Analysis Button
         self.predict_btn = ttk.Button(self.method_card,
-                                     text="🔍 Analyze X-ray",
-                                     style='Modern.TButton',
+                                     text="🚀 Run Advanced Analysis",
+                                     style='FPReduction.TButton',
                                      command=self.predict_image,
                                      state=tk.DISABLED)
         self.predict_btn.pack(fill=tk.X, pady=(15, 5))
         
-        # Update UI based on initial mode (NOW after all frames are created)
+        # Update UI based on initial mode
         self.on_mode_change()
         
-        # Results Card
-        self.create_results_card(parent)
+        # Advanced Results Card
+        self.create_advanced_results_card(parent)
 
-    def create_results_card(self, parent):
-        """Create modern results display card"""
-        results_card = self.create_card(parent, "📊 Analysis Results")
+    def create_advanced_results_card(self, parent):
+        """Create Advanced results display card with FP Reduction metrics"""
+        results_card = self.create_card(parent, "📊 Advanced Analysis Results")
         
         # Result display area
         self.result_display = tk.Frame(results_card, bg=self.colors['surface'])
         self.result_display.pack(fill=tk.X, pady=10)
         
-        # Prediction result
+        # Prediction result with confidence
         self.prediction_frame = tk.Frame(self.result_display, bg=self.colors['surface'])
         self.prediction_frame.pack(fill=tk.X, pady=5)
         
         pred_label = tk.Label(self.prediction_frame,
-                            text="Diagnosis:",
+                            text="Advanced Diagnosis:",
                             font=('Segoe UI', 10, 'bold'),
                             bg=self.colors['surface'],
                             fg=self.colors['text_primary'])
         pred_label.pack(anchor=tk.W)
         
         self.prediction_result_label = tk.Label(self.prediction_frame,
-                                              text="Awaiting analysis...",
+                                              text="Awaiting advanced analysis...",
                                               font=('Segoe UI', 12, 'bold'),
                                               bg=self.colors['surface'],
                                               fg=self.colors['text_secondary'])
         self.prediction_result_label.pack(anchor=tk.W, padx=10)
         
-        # Confidence
-        confidence_label = tk.Label(self.result_display,
-                                  text="Confidence:",
-                                  font=('Segoe UI', 10, 'bold'),
-                                  bg=self.colors['surface'],
-                                  fg=self.colors['text_primary'])
-        confidence_label.pack(anchor=tk.W, pady=(10, 0))
+        # Confidence metrics
+        confidence_frame = tk.Frame(self.result_display, bg=self.colors['surface'])
+        confidence_frame.pack(fill=tk.X, pady=5)
         
-        self.confidence_label = tk.Label(self.result_display,
-                                       text="-",
-                                       font=('Segoe UI', 11),
+        tk.Label(confidence_frame,
+                text="Confidence Metrics:",
+                font=('Segoe UI', 10, 'bold'),
+                bg=self.colors['surface'],
+                fg=self.colors['text_primary']).pack(anchor=tk.W)
+        
+        # Main confidence
+        conf_main_frame = tk.Frame(confidence_frame, bg=self.colors['surface'])
+        conf_main_frame.pack(fill=tk.X, pady=2)
+        
+        tk.Label(conf_main_frame, text="Prediction Confidence:",
+               font=('Segoe UI', 9),
+               bg=self.colors['surface'],
+               fg=self.colors['text_primary']).pack(side=tk.LEFT)
+        
+        self.confidence_label = tk.Label(conf_main_frame, text="-",
+                                       font=('Segoe UI', 9, 'bold'),
                                        bg=self.colors['surface'],
-                                       fg=self.colors['text_secondary'])
-        self.confidence_label.pack(anchor=tk.W, padx=10)
+                                       fg=self.colors['confidence'])
+        self.confidence_label.pack(side=tk.RIGHT)
         
-        # Scores frame
-        scores_frame = tk.Frame(self.result_display, bg=self.colors['surface'])
-        scores_frame.pack(fill=tk.X, pady=(10, 0))
+        # Uncertainty
+        uncertainty_frame = tk.Frame(confidence_frame, bg=self.colors['surface'])
+        uncertainty_frame.pack(fill=tk.X, pady=2)
         
-        # CNN Score
-        cnn_frame = tk.Frame(scores_frame, bg=self.colors['surface'])
-        cnn_frame.pack(fill=tk.X, pady=2)
-        
-        tk.Label(cnn_frame, text="CNN Score:",
+        tk.Label(uncertainty_frame, text="Uncertainty:",
                font=('Segoe UI', 9),
                bg=self.colors['surface'],
                fg=self.colors['text_primary']).pack(side=tk.LEFT)
         
-        self.cnn_score_label = tk.Label(cnn_frame, text="-",
-                                      font=('Segoe UI', 9, 'bold'),
-                                      bg=self.colors['surface'],
-                                      fg=self.colors['primary'])
-        self.cnn_score_label.pack(side=tk.RIGHT)
-        
-        # Hough Score
-        hough_frame = tk.Frame(scores_frame, bg=self.colors['surface'])
-        hough_frame.pack(fill=tk.X, pady=2)
-        
-        tk.Label(hough_frame, text="Hough Score:",
-               font=('Segoe UI', 9),
-               bg=self.colors['surface'],
-               fg=self.colors['text_primary']).pack(side=tk.LEFT)
-        
-        self.hough_score_label = tk.Label(hough_frame, text="-",
+        self.uncertainty_label = tk.Label(uncertainty_frame, text="-",
                                         font=('Segoe UI', 9, 'bold'),
                                         bg=self.colors['surface'],
-                                        fg=self.colors['secondary'])
-        self.hough_score_label.pack(side=tk.RIGHT)
+                                        fg=self.colors['fp_reduction'])
+        self.uncertainty_label.pack(side=tk.RIGHT)
+        
+        # Coverage status
+        coverage_frame = tk.Frame(confidence_frame, bg=self.colors['surface'])
+        coverage_frame.pack(fill=tk.X, pady=2)
+        
+        tk.Label(coverage_frame, text="Analysis Status:",
+               font=('Segoe UI', 9),
+               bg=self.colors['surface'],
+               fg=self.colors['text_primary']).pack(side=tk.LEFT)
+        
+        self.coverage_label = tk.Label(coverage_frame, text="-",
+                                     font=('Segoe UI', 9, 'bold'),
+                                     bg=self.colors['surface'],
+                                     fg=self.colors['sota'])
+        self.coverage_label.pack(side=tk.RIGHT)
         
         # Action buttons
         action_frame = tk.Frame(results_card, bg=self.colors['surface'])
@@ -449,35 +1166,42 @@ class ModernFractureDetectionApp:
                              command=self.save_result)
         save_btn.pack(side=tk.LEFT, padx=(0, 5))
         
-        eval_btn = ttk.Button(action_frame,
-                             text="📈 Evaluate Model",
-                             style='Modern.TButton',
-                             command=self.show_evaluation_menu)
-        eval_btn.pack(side=tk.LEFT)
+        confidence_btn = ttk.Button(action_frame,
+                                   text="📊 Confidence Analysis",
+                                   style='Confidence.TButton',
+                                   command=self.show_confidence_analysis)
+        confidence_btn.pack(side=tk.LEFT, padx=(0, 5))
 
     def create_card(self, parent, title):
-        """Create a modern card with shadow effect"""
+        """Create a modern card with Advanced styling"""
         # Card container with shadow effect
         card_container = tk.Frame(parent, bg=self.colors['background'])
         card_container.pack(fill=tk.X, pady=(0, 15))
-        
-        # Shadow frame
-        shadow_frame = tk.Frame(card_container, bg=self.colors['shadow'], height=2)
-        shadow_frame.pack(fill=tk.X, side=tk.BOTTOM)
         
         # Main card
         card = tk.Frame(card_container, bg=self.colors['surface'], relief='flat', bd=1)
         card.pack(fill=tk.BOTH, expand=True)
         
-        # Card header
-        header = tk.Frame(card, bg=self.colors['primary'], height=40)
+        # Card header color logic
+        if "FP Reduction" in title or "False Positive" in title:
+            header_color = self.colors['fp_reduction']
+        elif "SOTA" in title:
+            header_color = self.colors['sota']
+        elif "Analysis" in title:
+            header_color = self.colors['primary']
+        elif "Confidence" in title:
+            header_color = self.colors['confidence']
+        else:
+            header_color = self.colors['secondary']
+            
+        header = tk.Frame(card, bg=header_color, height=40)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
         
         title_label = tk.Label(header,
                              text=title,
                              font=('Segoe UI', 12, 'bold'),
-                             bg=self.colors['primary'],
+                             bg=header_color,
                              fg='white')
         title_label.pack(side=tk.LEFT, padx=15, pady=10)
         
@@ -488,7 +1212,7 @@ class ModernFractureDetectionApp:
         return content
 
     def create_image_panel(self, parent):
-        """Create modern image display panel"""
+        """Create enhanced image display panel"""
         # Images container
         images_frame = tk.Frame(parent, bg=self.colors['background'])
         images_frame.pack(fill=tk.BOTH, expand=True)
@@ -501,8 +1225,8 @@ class ModernFractureDetectionApp:
                                        relief='flat')
         self.canvas_original.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Heatmap image card
-        heatmap_card = self.create_image_card(images_frame, "🎯 Analysis Heatmap")
+        # Advanced analysis heatmap card
+        heatmap_card = self.create_image_card(images_frame, "🚀 Advanced Analysis + Confidence Map")
         self.canvas_heatmap = tk.Canvas(heatmap_card,
                                       bg='#1A202C',
                                       highlightthickness=0,
@@ -514,19 +1238,20 @@ class ModernFractureDetectionApp:
         card_frame = tk.Frame(parent, bg=self.colors['background'])
         card_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         
-        # Card with modern styling
+        # Card with Advanced styling
         card = tk.Frame(card_frame, bg=self.colors['surface'], relief='flat', bd=1)
         card.pack(fill=tk.BOTH, expand=True)
         
-        # Header
-        header = tk.Frame(card, bg=self.colors['primary'], height=35)
+        # Header với Advanced color for analysis
+        header_color = self.colors['fp_reduction'] if "Advanced" in title else self.colors['primary']
+        header = tk.Frame(card, bg=header_color, height=35)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
         
         title_label = tk.Label(header,
                              text=title,
                              font=('Segoe UI', 11, 'bold'),
-                             bg=self.colors['primary'],
+                             bg=header_color,
                              fg='white')
         title_label.pack(side=tk.LEFT, padx=12, pady=8)
         
@@ -537,553 +1262,82 @@ class ModernFractureDetectionApp:
         return image_area
 
     def create_footer(self, parent):
-        """Create modern footer with status and floating analysis button"""
+        """Create modern footer with Advanced styling"""
         footer = tk.Frame(parent, bg=self.colors['surface'], height=40, relief='flat', bd=1)
         footer.pack(fill=tk.X, pady=(20, 0))
         footer.pack_propagate(False)
         
-        # Status with icon
+        # Status with Advanced icon
         status_frame = tk.Frame(footer, bg=self.colors['surface'])
         status_frame.pack(side=tk.LEFT, fill=tk.Y, expand=True, padx=15, pady=8)
         
         status_icon = tk.Label(status_frame,
-                             text="🔄",
+                             text="🚀",
                              font=('Segoe UI', 12),
                              bg=self.colors['surface'])
         status_icon.pack(side=tk.LEFT)
         
-        self.status_var = tk.StringVar(value="Ready for analysis")
+        self.status_var = tk.StringVar(value="Advanced AI system with FP Reduction ready")
         self.status_label = tk.Label(status_frame,
                                    textvariable=self.status_var,
                                    font=('Segoe UI', 10),
                                    bg=self.colors['surface'],
                                    fg=self.colors['text_secondary'])
         self.status_label.pack(side=tk.LEFT, padx=(8, 0))
-        
-        # Create floating analysis button
-        self.create_floating_analysis_button(parent)
-        
-        # Create floating results panel
-        self.create_floating_results_panel(parent)
 
-    def create_floating_analysis_button(self, parent):
-        """Create a beautiful floating analysis button in bottom right corner"""
-        # Container for floating button
-        self.floating_container = tk.Frame(parent, bg=self.colors['background'])
-        self.floating_container.place(relx=1.0, rely=1.0, anchor='se', x=-30, y=-30)
-        
-        # Create circular button effect with shadow
-        self.create_floating_button_with_shadow()
-        
-        # Animation variables
-        self.button_hover = False
-        self.animation_frame = 0
-        self.animate_button()
-
-    def create_floating_button_with_shadow(self):
-        """Create floating button with shadow effect"""
-        # Shadow layer - using gray color instead of transparent
-        shadow_canvas = tk.Canvas(
-            self.floating_container,
-            width=80, height=80,
-            bg=self.colors['background'],
-            highlightthickness=0
-        )
-        shadow_canvas.pack()
-        
-        # Draw shadow circle with multiple layers for blur effect
-        shadow_colors = ['#D0D0D0', '#E0E0E0', '#F0F0F0']
-        for i, color in enumerate(shadow_colors):
-            offset = i + 4
-            size = 76 - i
-            shadow_canvas.create_oval(offset, offset, size, size, 
-                                    fill=color, outline='')
-        
-        # Main button layer
-        self.float_button_canvas = tk.Canvas(
-            shadow_canvas,
-            width=70, height=70,
-            bg=self.colors['background'],
-            highlightthickness=0
-        )
-        self.float_button_canvas.place(x=5, y=2)
-        
-        # Create gradient effect for button
-        self.draw_gradient_button()
-        
-        # Add icon and text
-        self.float_button_canvas.create_text(
-            35, 25,
-            text="🔬",
-            font=('Segoe UI', 16),
-            fill='white'
-        )
-        
-        self.float_button_canvas.create_text(
-            35, 45,
-            text="ANALYZE",
-            font=('Segoe UI', 8, 'bold'),
-            fill='white'
-        )
-        
-        # Bind events
-        self.float_button_canvas.bind("<Button-1>", self.floating_button_click)
-        self.float_button_canvas.bind("<Enter>", self.floating_button_enter)
-        self.float_button_canvas.bind("<Leave>", self.floating_button_leave)
-        
-        # Make all canvas items clickable
-        for item in self.float_button_canvas.find_all():
-            self.float_button_canvas.tag_bind(item, "<Button-1>", self.floating_button_click)
-            self.float_button_canvas.tag_bind(item, "<Enter>", self.floating_button_enter)
-            self.float_button_canvas.tag_bind(item, "<Leave>", self.floating_button_leave)
-
-    def draw_gradient_button(self, hover=False):
-        """Draw gradient button with hover effect"""
-        self.float_button_canvas.delete("button_bg")
-        
-        # Colors for gradient
-        if hover:
-            colors = ['#F18F01', '#E07A00', '#CC6600']  # Hover colors
-        else:
-            colors = ['#2E86AB', '#2574A1', '#1A5F7A']  # Normal colors
-        
-        # Draw gradient circles
-        for i, color in enumerate(colors):
-            size = 70 - (i * 4)
-            offset = i * 2
-            self.float_button_canvas.create_oval(
-                offset, offset, size, size,
-                fill=color, outline='',
-                tags="button_bg"
-            )
-        
-        # Move text to front
-        self.float_button_canvas.tag_raise("all")
-
-    def create_floating_results_panel(self, parent):
-        """Create floating results panel in top-right corner"""
-        # Container for floating results panel
-        self.floating_results_container = tk.Frame(parent, bg=self.colors['background'])
-        self.floating_results_container.place(relx=1.0, rely=0.0, anchor='ne', x=-20, y=20)
-        
-        # Main results panel (initially hidden)
-        self.create_floating_results_with_animation()
-        
-        # Animation variables for results panel
-        self.results_visible = False
-        self.results_animation_frame = 0
-
-    def create_floating_results_with_animation(self):
-        """Create floating results panel with modern design - WITHOUT detailed scores section"""
-        # Main panel frame
-        self.results_panel = tk.Frame(
-            self.floating_results_container,
-            bg=self.colors['surface'],
-            relief='flat',
-            bd=2,
-            width=350,
-            height=300  # Reduced height since we removed detailed scores
-        )
-        
-        # Initially hide the panel
-        self.results_panel.pack_propagate(False)
-        
-        # Header with close button
-        header_frame = tk.Frame(self.results_panel, bg=self.colors['primary'], height=40)
-        header_frame.pack(fill=tk.X)
-        header_frame.pack_propagate(False)
-        
-        # Title
-        title_label = tk.Label(
-            header_frame,
-            text="📊 Analysis Results",
-            font=('Segoe UI', 12, 'bold'),
-            bg=self.colors['primary'],
-            fg='white'
-        )
-        title_label.pack(side=tk.LEFT, padx=15, pady=10)
-        
-        # Close button
-        close_btn = tk.Button(
-            header_frame,
-            text="✕",
-            font=('Segoe UI', 12, 'bold'),
-            bg=self.colors['primary'],
-            fg='white',
-            activebackground=self.colors['success'],
-            activeforeground='white',
-            relief='flat',
-            bd=0,
-            width=3,
-            command=self.hide_floating_results
-        )
-        close_btn.pack(side=tk.RIGHT, padx=10, pady=8)
-        
-        # Content area
-        content_frame = tk.Frame(self.results_panel, bg=self.colors['surface'])
-        content_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
-        
-        # Main diagnosis display
-        self.diagnosis_frame = tk.Frame(content_frame, bg=self.colors['surface'])
-        self.diagnosis_frame.pack(fill=tk.X, pady=(0, 20))
-        
-        # Large diagnosis text
-        self.floating_diagnosis_label = tk.Label(
-            self.diagnosis_frame,
-            text="Awaiting Analysis...",
-            font=('Segoe UI', 16, 'bold'),
-            bg=self.colors['surface'],
-            fg=self.colors['text_secondary'],
-            wraplength=300,
-            justify=tk.CENTER
-        )
-        self.floating_diagnosis_label.pack()
-        
-        # Confidence display with progress bar effect
-        confidence_frame = tk.Frame(content_frame, bg=self.colors['surface'])
-        confidence_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        tk.Label(
-            confidence_frame,
-            text="Confidence Level:",
-            font=('Segoe UI', 11, 'bold'),
-            bg=self.colors['surface'],
-            fg=self.colors['text_primary']
-        ).pack(anchor=tk.W)
-        
-        # Confidence progress bar
-        self.confidence_progress = ttk.Progressbar(
-            confidence_frame,
-            mode='determinate',
-            length=320,
-            style='TProgressbar'
-        )
-        self.confidence_progress.pack(fill=tk.X, pady=(5, 0))
-        
-        self.floating_confidence_label = tk.Label(
-            confidence_frame,
-            text="0%",
-            font=('Segoe UI', 10),
-            bg=self.colors['surface'],
-            fg=self.colors['text_secondary']
-        )
-        self.floating_confidence_label.pack(anchor=tk.E, pady=(2, 0))
-        
-        # Analysis method display
-        method_frame = tk.Frame(content_frame, bg=self.colors['surface'])
-        method_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        tk.Label(
-            method_frame,
-            text="Analysis Method:",
-            font=('Segoe UI', 11, 'bold'),
-            bg=self.colors['surface'],
-            fg=self.colors['text_primary']
-        ).pack(anchor=tk.W)
-        
-        self.floating_method_label = tk.Label(
-            method_frame,
-            text="Not analyzed",
-            font=('Segoe UI', 10),
-            bg=self.colors['surface'],
-            fg=self.colors['text_secondary']
-        )
-        self.floating_method_label.pack(anchor=tk.W, padx=10)
-        
-        # Action buttons
-        actions_frame = tk.Frame(content_frame, bg=self.colors['surface'])
-        actions_frame.pack(fill=tk.X, side=tk.BOTTOM)
-        
-        # Save button
-        save_result_btn = tk.Button(
-            actions_frame,
-            text="💾 Save Results",
-            font=('Segoe UI', 10, 'bold'),
-            bg=self.colors['accent'],
-            fg='white',
-            activebackground=self.colors['secondary'],
-            activeforeground='white',
-            relief='flat',
-            pady=8,
-            command=self.save_result
-        )
-        save_result_btn.pack(fill=tk.X, pady=(0, 5))
-        
-        # View details button
-        details_btn = tk.Button(
-            actions_frame,
-            text="🔍 View Detailed Analysis",
-            font=('Segoe UI', 10),
-            bg=self.colors['surface'],
-            fg=self.colors['text_primary'],
-            activebackground=self.colors['border'],
-            relief='solid',
-            bd=1,
-            pady=8,
-            command=self.show_detailed_analysis
-        )
-        details_btn.pack(fill=tk.X)
-
-    def show_floating_results(self):
-        """Show floating results panel with animation"""
-        if not self.results_visible:
-            self.results_panel.pack(fill=tk.BOTH, expand=True)
-            self.results_visible = True
-            self.animate_results_panel_in()
-
-    def hide_floating_results(self):
-        """Hide floating results panel with animation"""
-        if self.results_visible:
-            self.animate_results_panel_out()
-
-    def animate_results_panel_in(self):
-        """Animate results panel sliding in"""
-        # Start from right side (hidden)
-        start_x = 400
-        target_x = -20
-        
-        # Animate sliding in
-        def slide_in(current_x):
-            if current_x > target_x:
-                new_x = current_x - 20
-                self.floating_results_container.place(relx=1.0, rely=0.0, anchor='ne', x=new_x, y=20)
-                self.master.after(20, lambda: slide_in(new_x))
-            else:
-                self.floating_results_container.place(relx=1.0, rely=0.0, anchor='ne', x=target_x, y=20)
-        
-        slide_in(start_x)
-
-    def animate_results_panel_out(self):
-        """Animate results panel sliding out"""
-        start_x = -20
-        target_x = 400
-        
-        def slide_out(current_x):
-            if current_x < target_x:
-                new_x = current_x + 20
-                self.floating_results_container.place(relx=1.0, rely=0.0, anchor='ne', x=new_x, y=20)
-                self.master.after(20, lambda: slide_out(new_x))
-            else:
-                self.results_panel.pack_forget()
-                self.results_visible = False
-        
-        slide_out(start_x)
-
-    def update_floating_results(self, result):
-        """Update floating results panel with new data"""
-        # Show the panel if hidden
-        self.show_floating_results()
-        
-        # Update diagnosis
-        if result['predicted_label'] == 1:
-            diagnosis_text = "⚠️ FRACTURE DETECTED"
-            diagnosis_color = self.colors['success']
-        else:
-            diagnosis_text = "✅ NO FRACTURE DETECTED"
-            diagnosis_color = self.colors['primary']
-        
-        self.floating_diagnosis_label.config(
-            text=diagnosis_text,
-            fg=diagnosis_color
-        )
-        
-        # Update confidence with animation
-        confidence = result['confidence']
-        self.floating_confidence_label.config(text=f"{confidence:.1f}%")
-        
-        # Animate confidence bar
-        self.animate_confidence_bar(confidence)
-        
-        # Update method
-        mode = self.current_mode.get()
-        if mode == "single":
-            method_text = f"Single Model - {result.get('method', 'Unknown').upper()}"
-        else:
-            method_text = f"Ensemble - {result.get('voting_method', 'Unknown').upper()}"
-            
-        self.floating_method_label.config(text=method_text)
-
-    def animate_confidence_bar(self, target_confidence):
-        """Animate confidence progress bar"""
-        def animate_progress(current_value):
-            if current_value < target_confidence:
-                new_value = min(current_value + 2, target_confidence)
-                self.confidence_progress['value'] = new_value
-                self.master.after(50, lambda: animate_progress(new_value))
-            else:
-                self.confidence_progress['value'] = target_confidence
-        
-        self.confidence_progress['value'] = 0
-        animate_progress(0)
-
-    def show_detailed_analysis(self):
-        """Show detailed analysis in separate window"""
-        if self.prediction_result is None:
-            messagebox.showinfo("Info", "No analysis results available!")
-            return
-        
-        # Create detailed window
-        detail_window = tk.Toplevel(self.master)
-        detail_window.title("Detailed Analysis Results")
-        detail_window.geometry("800x600")
-        detail_window.configure(bg=self.colors['background'])
-        
-        # Create visualization
-        mode = self.current_mode.get()
-        
-        try:
-            if mode == "single":
-                fig = self.detector.visualize_result(self.prediction_result)
-            else:
-                fig = self.ensemble.visualize_ensemble_result(self.prediction_result)
-            
-            # Embed in tkinter window
-            canvas = FigureCanvasTkAgg(fig, master=detail_window)
-            canvas.draw()
-            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-            
-        except Exception as e:
-            error_label = tk.Label(
-                detail_window,
-                text=f"Error creating visualization: {str(e)}",
-                font=('Segoe UI', 12),
-                bg=self.colors['background'],
-                fg=self.colors['success']
-            )
-            error_label.pack(expand=True)
-
-    def floating_button_enter(self, event):
-        """Handle floating button hover enter"""
-        self.button_hover = True
-        self.draw_gradient_button(hover=True)
-        self.float_button_canvas.configure(cursor="hand2")
-
-    def floating_button_leave(self, event):
-        """Handle floating button hover leave"""
-        self.button_hover = False
-        self.draw_gradient_button(hover=False)
-        self.float_button_canvas.configure(cursor="")
-
-    def floating_button_click(self, event):
-        """Handle floating button click with animation"""
-        # Button press animation
-        self.animate_button_press()
-        
-        # Trigger prediction
-        self.predict_image()
-
-    def animate_button_press(self):
-        """Animate button press effect"""
-        # Scale down
-        self.float_button_canvas.place(x=7, y=4)
-        self.float_button_canvas.configure(width=66, height=66)
-        
-        # Scale back up after 100ms
-        self.master.after(100, self.reset_button_scale)
-
-    def reset_button_scale(self):
-        """Reset button to normal scale"""
-        self.float_button_canvas.place(x=5, y=2)
-        self.float_button_canvas.configure(width=70, height=70)
-
-    def animate_button(self):
-        """Create subtle floating animation"""
-        if not self.button_hover:
-            # Subtle floating effect
-            self.animation_frame += 1
-            offset_y = 2 + int(2 * np.sin(self.animation_frame * 0.1))
-            
-            try:
-                self.float_button_canvas.place(x=5, y=offset_y)
-            except:
-                pass  # Handle case where widget is destroyed
-        
-        # Continue animation
-        try:
-            self.master.after(50, self.animate_button)
-        except:
-            pass  # Handle case where master is destroyed
-
-    def update_floating_button_state(self):
-        """Update floating button state based on app state"""
-        if hasattr(self, 'float_button_canvas'):
-            mode = self.current_mode.get()
-            
-            if mode == "single":
-                ready = self.current_image_path and self.model_loaded
-            else:  # ensemble
-                ready = self.current_image_path and self.ensemble_loaded
-            
-            if ready:
-                # Enable button
-                self.float_button_canvas.configure(state='normal')
-                if not self.button_hover:
-                    self.draw_gradient_button(hover=False)
-            else:
-                # Disable button - make it gray
-                self.float_button_canvas.delete("button_bg")
-                self.float_button_canvas.create_oval(
-                    0, 0, 70, 70,
-                    fill='#CCCCCC', outline='',
-                    tags="button_bg"
-                )
-                self.float_button_canvas.tag_raise("all")
-
+    # Mode and UI Management Methods
     def on_mode_change(self):
-        """Handle mode change between single and ensemble"""
+        """Handle mode change between SOTA, ensemble, and SOTA+FP"""
         mode = self.current_mode.get()
         
-        if mode == "single":
-            # Show single model UI
-            self.model_info_frame.pack(fill=tk.X, pady=5)
-            self.ensemble_info_frame.pack_forget()
-            self.model_btn.pack(fill=tk.X, pady=(0, 5))
-            self.ensemble_btn.pack_forget()
+        if mode == "sota_fp":
+            # Show SOTA+FP UI
+            self.fp_config_card.pack(fill=tk.X, pady=(0, 15))
+            self.sota_methods_frame.pack(fill=tk.X, pady=5)
+            self.predict_btn.config(text="🚀 Run Advanced Analysis + FP Reduction")
             
-            # Show single methods
-            self.single_methods_frame.pack(fill=tk.X, pady=5)
-            self.ensemble_methods_frame.pack_forget()
-            
-            # Update card title
-            for widget in self.model_card.master.winfo_children():
-                if isinstance(widget, tk.Frame):
-                    for child in widget.winfo_children():
-                        if isinstance(child, tk.Frame):
-                            for label in child.winfo_children():
-                                if isinstance(label, tk.Label) and "Model Configuration" in label.cget("text"):
-                                    label.config(text="🤖 Single Model Configuration")
-                                    break
+        elif mode == "sota":
+            # Show SOTA only UI
+            self.fp_config_card.pack_forget()
+            self.sota_methods_frame.pack(fill=tk.X, pady=5)
+            self.predict_btn.config(text="🔬 Run SOTA Analysis")
             
         else:  # ensemble
             # Show ensemble UI
-            self.model_info_frame.pack_forget()
-            self.ensemble_info_frame.pack(fill=tk.X, pady=5)
-            self.model_btn.pack_forget()
-            self.ensemble_btn.pack(fill=tk.X, pady=(0, 5))
-            
-            # Show ensemble methods
-            self.single_methods_frame.pack_forget()
-            self.ensemble_methods_frame.pack(fill=tk.X, pady=5)
-            
-            # Update card title
-            for widget in self.model_card.master.winfo_children():
-                if isinstance(widget, tk.Frame):
-                    for child in widget.winfo_children():
-                        if isinstance(child, tk.Frame):
-                            for label in child.winfo_children():
-                                if isinstance(label, tk.Label) and ("Model Configuration" in label.cget("text") or "Single Model" in label.cget("text")):
-                                    label.config(text="🚀 Ensemble Configuration")
-                                    break
+            self.fp_config_card.pack_forget()
+            self.sota_methods_frame.pack_forget()
+            self.predict_btn.config(text="🔗 Run Ensemble Analysis")
         
         # Update predict button state
         self.update_predict_button_state()
 
+    def on_fp_toggle(self):
+        """Handle FP reduction toggle"""
+        if self.fp_reduction_enabled.get():
+            self.status_var.set("FP Reduction enabled - Enhanced specificity mode")
+        else:
+            self.status_var.set("FP Reduction disabled - Standard analysis mode")
+
     def update_predict_button_state(self):
         """Update predict button state based on current mode"""
         mode = self.current_mode.get()
+        method = self.method_var.get()
         
-        if mode == "single":
-            # Enable if single model loaded and image selected
+        if mode == "sota_fp":
+            # Check requirements based on selected method
+            if "hough" in method and not self.hough_initialized:
+                self.predict_btn.config(state=tk.DISABLED)
+                return
+            if "_fp" in method and not self.fp_reducer:
+                self.predict_btn.config(state=tk.DISABLED)
+                return
+            # Enable if basic requirements met
+            if self.model_loaded and self.current_image_path:
+                self.predict_btn.config(state=tk.NORMAL)
+            else:
+                self.predict_btn.config(state=tk.DISABLED)
+        elif mode == "sota":
+            # Enable if SOTA model loaded and image selected
             if self.model_loaded and self.current_image_path:
                 self.predict_btn.config(state=tk.NORMAL)
             else:
@@ -1095,14 +1349,248 @@ class ModernFractureDetectionApp:
             else:
                 self.predict_btn.config(state=tk.DISABLED)
 
-    def initialize_ensemble(self):
-        """Initialize ensemble system"""
-        self.ensemble_btn.config(state=tk.DISABLED)
-        self.status_var.set("Initializing ensemble system...")
-        self.ensemble_status_label.config(text="Initializing...", fg=self.colors['accent'])
+    # Model Management Methods
+    def load_sota_model_async(self, model_type="resnet50v2", region="XR_HAND"):
+        """Load SOTA model asynchronously"""
+        self.predict_btn.config(state=tk.DISABLED)
+        self.status_var.set("Loading SOTA model...")
+        self.model_status_label.config(text="Loading SOTA model...", fg=self.colors['sota'])
         self.progress_bar.start(10)
         
-        # Run in separate thread
+        self.load_model_thread = threading.Thread(target=self.load_sota_model, args=(model_type, region))
+        self.load_model_thread.daemon = True
+        self.load_model_thread.start()
+
+    def load_sota_model(self, model_type="resnet50v2", region="XR_HAND"):
+        """Load SOTA model in background"""
+        try:
+            # Define SOTA model paths
+            base_dir = "C:\\Users\\USER\\Documents\\coze"
+            model_paths = [
+                os.path.join(base_dir, "models", "res", f"{model_type}_{region}_best.h5"),
+                os.path.join(base_dir, "models", "den", f"{model_type}_{region}_best.h5"),
+                os.path.join(base_dir, "models", f"{model_type}_{region}_best.h5"),
+            ]
+            
+            model_path = None
+            for path in model_paths:
+                if os.path.exists(path):
+                    model_path = path
+                    break
+            
+            if model_path is None:
+                raise FileNotFoundError(f"SOTA model file not found: {model_type}_{region}_best.h5")
+
+            # Initialize SOTA detector
+            if StateOfTheArtFractureDetector:
+                self.sota_detector = StateOfTheArtFractureDetector(model_path)
+                self.model_loaded = True
+                self.master.after(0, self.update_sota_model_info, model_type, region, model_path)
+            else:
+                raise ImportError("StateOfTheArtFractureDetector not available")
+            
+        except Exception as e:
+            self.master.after(0, self.show_error, f"Error loading SOTA model: {str(e)}")
+
+    def update_sota_model_info(self, model_type, region, model_path):
+        """Update SOTA model information in UI"""
+        self.progress_bar.stop()
+        model_display_name = {"densenet121": "DenseNet121", "resnet50v2": "ResNet50V2"}.get(model_type, model_type)
+        
+        self.model_status_label.config(
+            text=f"✅ SOTA {model_display_name} ({region})",
+            fg=self.colors['sota']
+        )
+        self.status_var.set(f"SOTA model loaded: {model_display_name} for {region}")
+        
+        self.update_predict_button_state()
+
+    def initialize_fp_reducer(self):
+        """Initialize FP Reduction system"""
+        if not self.model_loaded:
+            messagebox.showwarning("Warning", "Please load a SOTA model first!")
+            return
+            
+        self.fp_init_btn.config(state=tk.DISABLED)
+        self.status_var.set("Initializing FP Reduction system...")
+        self.fp_status_label.config(text="Initializing FP Reducer...", fg=self.colors['fp_reduction'])
+        self.progress_bar.start(10)
+        
+        fp_thread = threading.Thread(target=self.load_fp_reducer)
+        fp_thread.daemon = True
+        fp_thread.start()
+
+    def load_fp_reducer(self):
+        """Load FP Reduction system in background"""
+        try:
+            # Apply TensorFlow compatibility fixes
+            import tensorflow as tf
+            
+            # Ensure TensorFlow 2.x compatibility
+            if not hasattr(tf, 'reduce_std'):
+                def safe_reduce_std(input_tensor, axis=None, keepdims=False):
+                    try:
+                        return tf.math.reduce_std(input_tensor, axis=axis, keepdims=keepdims)
+                    except AttributeError:
+                        mean = tf.reduce_mean(input_tensor, axis=axis, keepdims=True)
+                        squared_diff = tf.square(input_tensor - mean)
+                        variance = tf.reduce_mean(squared_diff, axis=axis, keepdims=keepdims)
+                        return tf.sqrt(variance)
+                
+                tf.reduce_std = safe_reduce_std
+            
+            # Initialize FP Reducer with SOTA model
+            if not self.sota_detector:
+                raise ValueError("SOTA detector not available")
+                
+            models = [self.sota_detector.cnn_model] if hasattr(self.sota_detector, 'cnn_model') else []
+            
+            if not models:
+                raise ValueError("No SOTA model available for FP Reduction")
+            
+            # Check if AdvancedFalsePositiveReducer is available
+            if AdvancedFalsePositiveReducer == type:
+                raise ValueError("FP Reduction system not available - please check imports")
+            
+            self.fp_reducer = AdvancedFalsePositiveReducer(
+                models, 
+                target_specificity=self.target_specificity.get()
+            )
+            
+            # Note: In production, you would train the FP reducer here with validation data
+            # For demo, we'll use default settings
+            
+            self.master.after(0, self.update_fp_reducer_info)
+            
+        except Exception as e:
+            error_msg = f"Error initializing FP Reducer: {str(e)}"
+            print(f"🔧 {error_msg}")
+            self.master.after(0, self.show_error, error_msg)
+
+    def update_fp_reducer_info(self):
+        """Update FP Reducer information in UI"""
+        self.progress_bar.stop()
+        
+        self.fp_status_label.config(
+            text="✅ FP Reducer Ready",
+            fg=self.colors['fp_reduction']
+        )
+        self.status_var.set("FP Reduction system initialized - Enhanced specificity enabled")
+        
+        self.fp_init_btn.config(state=tk.NORMAL)
+        self.update_predict_button_state()
+
+    def initialize_sota_hough(self):
+        """Initialize SOTA Hough Transform system"""
+        self.hough_init_btn.config(state=tk.DISABLED)
+        self.status_var.set("Initializing SOTA Hough Transform...")
+        self.hough_status_label.config(text="Initializing SOTA Hough...", fg=self.colors['confidence'])
+        self.progress_bar.start(10)
+        
+        hough_thread = threading.Thread(target=self.load_sota_hough)
+        hough_thread.daemon = True
+        hough_thread.start()
+
+    def load_sota_hough(self):
+        """Load SOTA Hough system in background"""
+        try:
+            # Apply TensorFlow fixes if needed
+            import tensorflow as tf
+            
+            # Check for TensorFlow 2.x compatibility
+            if not hasattr(tf, 'reduce_std'):
+                # Add compatibility function
+                def safe_reduce_std(input_tensor, axis=None, keepdims=False):
+                    try:
+                        return tf.math.reduce_std(input_tensor, axis=axis, keepdims=keepdims)
+                    except AttributeError:
+                        mean = tf.reduce_mean(input_tensor, axis=axis, keepdims=True)
+                        squared_diff = tf.square(input_tensor - mean)
+                        variance = tf.reduce_mean(squared_diff, axis=axis, keepdims=keepdims)
+                        return tf.sqrt(variance)
+                
+                tf.reduce_std = safe_reduce_std
+            
+            # Initialize SOTA Hough Transform
+            self.sota_hough = SOTAHoughTransform()
+            self.hough_initialized = True
+            self.master.after(0, self.update_sota_hough_info)
+            
+        except Exception as e:
+            error_msg = f"Error initializing SOTA Hough: {str(e)}"
+            print(f"🔧 {error_msg}")
+            self.master.after(0, self.show_error, error_msg)
+
+    def update_sota_hough_info(self):
+        """Update SOTA Hough information in UI"""
+        self.progress_bar.stop()
+        
+        self.hough_status_label.config(
+            text="✅ SOTA Hough Ready",
+            fg=self.colors['confidence']
+        )
+        self.status_var.set("SOTA Hough Transform initialized - Advanced line detection enabled")
+        
+        self.hough_init_btn.config(state=tk.NORMAL)
+        self.update_predict_button_state()
+
+    def show_sota_model_menu(self):
+        """Show SOTA model selection menu"""
+        menu_window = tk.Toplevel(self.master)
+        menu_window.title("Select SOTA Model")
+        menu_window.geometry("450x350")
+        menu_window.configure(bg=self.colors['background'])
+        menu_window.resizable(False, False)
+        
+        # Center the window
+        menu_window.transient(self.master)
+        menu_window.grab_set()
+        
+        # SOTA Title
+        title_label = tk.Label(menu_window,
+                             text="🚀 Select SOTA Model",
+                             font=('Segoe UI', 18, 'bold'),
+                             bg=self.colors['background'],
+                             fg=self.colors['sota'])
+        title_label.pack(pady=20)
+        
+        # SOTA Model options
+        options_frame = tk.Frame(menu_window, bg=self.colors['background'])
+        options_frame.pack(fill=tk.BOTH, expand=True, padx=30)
+        
+        sota_models = [
+            ("SOTA DenseNet121", "densenet121", "🧠 Dynamic Snake Conv + Weighted Channel Attention"),
+            ("SOTA ResNet50V2", "resnet50v2", "🔬 Multi-scale Fusion + Advanced Grad-CAM")
+        ]
+        
+        for name, code, desc in sota_models:
+            btn = tk.Button(options_frame,
+                          text=f"{name}\n{desc}",
+                          font=('Segoe UI', 11, 'bold'),
+                          bg=self.colors['sota'],
+                          fg='white',
+                          activebackground=self.colors['primary'],
+                          activeforeground='white',
+                          relief='flat',
+                          pady=15,
+                          command=lambda c=code: self.select_sota_model(c, menu_window))
+            btn.pack(fill=tk.X, pady=8)
+
+    def select_sota_model(self, model_type, window):
+        """Select and load SOTA model"""
+        window.destroy()
+        self.load_sota_model_async(model_type)
+
+    def initialize_ensemble(self):
+        """Initialize ensemble system"""
+        if not MultiRegionEnsemble:
+            messagebox.showerror("Error", "Ensemble system not available - please check imports")
+            return
+            
+        self.ensemble_btn.config(state=tk.DISABLED)
+        self.status_var.set("Initializing ensemble system...")
+        self.progress_bar.start(10)
+        
         ensemble_thread = threading.Thread(target=self.load_ensemble)
         ensemble_thread.daemon = True
         ensemble_thread.start()
@@ -1119,238 +1607,26 @@ class ModernFractureDetectionApp:
     def update_ensemble_info(self):
         """Update ensemble information in UI"""
         self.progress_bar.stop()
-        
-        if self.ensemble and len(self.ensemble.models) > 0:
-            self.ensemble_status_label.config(
-                text="✅ Ensemble Ready",
-                fg=self.colors['primary']
-            )
-            self.ensemble_models_label.config(
-                text=f"Models: {len(self.ensemble.models)} regions loaded"
-            )
-            self.status_var.set(f"Ensemble initialized with {len(self.ensemble.models)} models")
-        else:
-            self.ensemble_status_label.config(
-                text="❌ No models found",
-                fg=self.colors['success']
-            )
-            self.ensemble_models_label.config(text="Models: 0")
-            self.status_var.set("No ensemble models found")
-        
         self.ensemble_btn.config(state=tk.NORMAL)
         self.update_predict_button_state()
 
-    def show_model_menu(self):
-        """Show modern model selection menu"""
-        menu_window = tk.Toplevel(self.master)
-        menu_window.title("Select Model")
-        menu_window.geometry("400x300")
-        menu_window.configure(bg=self.colors['background'])
-        menu_window.resizable(False, False)
-        
-        # Center the window
-        menu_window.transient(self.master)
-        menu_window.grab_set()
-        
-        # Title
-        title_label = tk.Label(menu_window,
-                             text="🤖 Select AI Model",
-                             font=('Segoe UI', 16, 'bold'),
-                             bg=self.colors['background'],
-                             fg=self.colors['text_primary'])
-        title_label.pack(pady=20)
-        
-        # Model options
-        options_frame = tk.Frame(menu_window, bg=self.colors['background'])
-        options_frame.pack(fill=tk.BOTH, expand=True, padx=30)
-        
-        models = [
-            ("DenseNet121", "densenet121", "🧠 Advanced neural network architecture"),
-            ("ResNet50V2", "resnet50v2", "🔬 Residual network with skip connections")
-        ]
-        
-        for name, code, desc in models:
-            btn = tk.Button(options_frame,
-                          text=f"{name}\n{desc}",
-                          font=('Segoe UI', 11, 'bold'),
-                          bg=self.colors['primary'],
-                          fg='white',
-                          activebackground=self.colors['accent'],
-                          activeforeground='white',
-                          relief='flat',
-                          pady=15,
-                          command=lambda c=code: self.select_model(c, menu_window))
-            btn.pack(fill=tk.X, pady=5)
-        
-        # Custom model option
-        custom_btn = tk.Button(options_frame,
-                             text="📁 Browse Custom Model",
-                             font=('Segoe UI', 11),
-                             bg=self.colors['surface'],
-                             fg=self.colors['text_primary'],
-                             activebackground=self.colors['border'],
-                             relief='solid',
-                             bd=1,
-                             pady=10,
-                             command=lambda: self.browse_custom_model(menu_window))
-        custom_btn.pack(fill=tk.X, pady=(10, 5))
-
-    def select_model(self, model_type, window):
-        """Select and load model"""
-        window.destroy()
-        self.load_model_async(model_type)
-
-    def browse_custom_model(self, window):
-        """Browse for custom model file"""
-        window.destroy()
-        self.browse_model()
-
-    def show_evaluation_menu(self):
-        """Show evaluation options menu"""
-        mode = self.current_mode.get()
-        
-        if mode == "single":
-            if not self.model_loaded:
-                messagebox.showwarning("Warning", "Please load a model first!")
-                return
-        else:  # ensemble
-            if not self.ensemble_loaded:
-                messagebox.showwarning("Warning", "Please initialize ensemble system first!")
-                return
-            
-        menu_window = tk.Toplevel(self.master)
-        menu_window.title(f"{'Ensemble' if mode == 'ensemble' else 'Model'} Evaluation")
-        menu_window.geometry("350x250")
-        menu_window.configure(bg=self.colors['background'])
-        menu_window.resizable(False, False)
-        
-        # Center the window
-        menu_window.transient(self.master)
-        menu_window.grab_set()
-        
-        # Title
-        title_label = tk.Label(menu_window,
-                             text=f"📈 {'Ensemble' if mode == 'ensemble' else 'Model'} Evaluation",
-                             font=('Segoe UI', 16, 'bold'),
-                             bg=self.colors['background'],
-                             fg=self.colors['text_primary'])
-        title_label.pack(pady=20)
-        
-        # Options
-        options_frame = tk.Frame(menu_window, bg=self.colors['background'])
-        options_frame.pack(fill=tk.BOTH, expand=True, padx=30)
-        
-        if mode == "single":
-            methods = [
-                ("CNN Evaluation", "cnn"),
-                ("Hough Transform Evaluation", "hough"),
-                ("Combined Method Evaluation", "combined")
-            ]
-        else:  # ensemble
-            methods = [
-                ("Weighted Average Voting", "weighted_average"),
-                ("Majority Vote Evaluation", "majority_vote"),
-                ("Max Confidence Evaluation", "max_confidence")
-            ]
-        
-        for name, method in methods:
-            btn = tk.Button(options_frame,
-                          text=name,
-                          font=('Segoe UI', 11),
-                          bg=self.colors['accent'],
-                          fg='white',
-                          activebackground=self.colors['secondary'],
-                          activeforeground='white',
-                          relief='flat',
-                          pady=10,
-                          command=lambda m=method: self.start_evaluation(m, menu_window))
-            btn.pack(fill=tk.X, pady=3)
-
-    def start_evaluation(self, method, window):
-        """Start model evaluation"""
-        window.destroy()
-        self.evaluate_model(method)
-
-    # Model loading methods
-    def load_model_async(self, model_type="resnet50v2", region="XR_HAND"):
-        """Load model asynchronously with progress indication"""
-        self.predict_btn.config(state=tk.DISABLED)
-        self.status_var.set("Loading model...")
-        self.model_name_label.config(text="Loading model...", fg=self.colors['accent'])
-        self.progress_bar.start(10)
-        
-        self.load_model_thread = threading.Thread(target=self.load_model, args=(model_type, region))
-        self.load_model_thread.daemon = True
-        self.load_model_thread.start()
-
-    def load_model(self, model_type="resnet50v2", region="XR_HAND"):
-        """Load CNN model from .h5 file"""
-        try:
-            # Define model paths
-            res_model_path = f"C:\\Users\\USER\\Documents\\coze\\models\\res\\{model_type}_{region}_best.h5"
-            den_model_path = f"C:\\Users\\USER\\Documents\\coze\\models\\den\\{model_type}_{region}_best.h5"
-
-            # Check for model file existence
-            if os.path.exists(res_model_path):
-                model_path = res_model_path
-            elif os.path.exists(den_model_path):
-                model_path = den_model_path
-            else:
-                raise FileNotFoundError(f"Model file not found: {model_type}_{region}_best.h5")
-
-            self.detector = FractureDetector(model_path)
-            self.model_loaded = True
-            self.master.after(0, self.update_model_info, model_type, region, model_path)
-        except Exception as e:
-            self.master.after(0, self.show_error, f"Error loading model: {str(e)}")
-
-    def update_model_info(self, model_type, region, model_path):
-        """Update model information in UI"""
-        self.progress_bar.stop()
-        model_display_name = {"densenet121": "DenseNet121", "resnet50v2": "ResNet50V2"}.get(model_type, model_type)
-        
-        self.model_name_label.config(
-            text=f"✅ {model_display_name}",
-            fg=self.colors['primary']
-        )
-        self.region_label.config(text=f"Region: {region}")
-        self.status_var.set(f"Model loaded: {model_display_name} for {region}")
-        
-        if self.current_image_path:
-            self.predict_btn.config(state=tk.NORMAL)
-        
-        self.update_predict_button_state()
-
-    # Image handling methods
+    # Image Management
     def browse_image(self):
         """Browse for X-ray image"""
         supported_formats = ('.png', '.jpg', '.jpeg')
         image_path = filedialog.askopenfilename(
-            title="Select X-ray Image",
+            title="Select X-ray Image for Advanced Analysis",
             filetypes=[("Image files", "*.png *.jpg *.jpeg"), ("All files", "*.*")]
         )
         
         if image_path:
-            if not image_path.lower().endswith(supported_formats):
-                self.show_error(f"Unsupported file format. Please select .png, .jpg or .jpeg file.")
-                return
-
-            if not os.path.exists(image_path):
-                self.show_error(f"File not found: {image_path}")
-                return
-
             self.current_image_path = image_path
             self.load_image(image_path)
-            if self.model_loaded:
-                self.predict_btn.config(state=tk.NORMAL)
             self.reset_prediction_results()
-            
-            # Update floating button state
-            self.update_floating_button_state()
             self.update_predict_button_state()
 
     def load_image(self, image_path):
-        """Load and display image with modern styling"""
+        """Load and display image"""
         try:
             # Read image
             image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
@@ -1360,9 +1636,9 @@ class ModernFractureDetectionApp:
             # Display original image
             self.display_image(image, self.canvas_original)
 
-            # Display placeholder for heatmap
+            # Display placeholder for analysis
             placeholder = np.zeros_like(image)
-            self.display_image_with_text(placeholder, self.canvas_heatmap, "Awaiting analysis...")
+            self.display_image_with_text(placeholder, self.canvas_heatmap, "Awaiting advanced analysis...")
 
             # Update image info
             filename = os.path.basename(image_path)
@@ -1376,13 +1652,9 @@ class ModernFractureDetectionApp:
 
         except Exception as e:
             self.show_error(f"Error loading image: {str(e)}")
-            self.canvas_original.delete("all")
-            self.canvas_heatmap.delete("all")
-            self.display_placeholder(self.canvas_original, "❌ Error loading image")
-            self.display_placeholder(self.canvas_heatmap, "❌ No image")
 
     def display_image(self, image, canvas):
-        """Display image on canvas with modern styling"""
+        """Display image on canvas"""
         canvas.update()
         canvas_width = max(canvas.winfo_width(), 400)
         canvas_height = max(canvas.winfo_height(), 400)
@@ -1404,22 +1676,18 @@ class ModernFractureDetectionApp:
         # Resize image
         resized_image = cv2.resize(image, (new_width, new_height))
         
-        # Convert to PIL for better display
+        # Convert to PIL for display
         if len(resized_image.shape) == 2:
             pil_image = Image.fromarray(resized_image).convert('RGB')
         else:
             pil_image = Image.fromarray(cv2.cvtColor(resized_image, cv2.COLOR_BGR2RGB))
         
-        # Add subtle border
-        bordered_image = Image.new('RGB', (new_width + 4, new_height + 4), self.colors['border'])
-        bordered_image.paste(pil_image, (2, 2))
-        
-        photo = ImageTk.PhotoImage(image=bordered_image)
+        photo = ImageTk.PhotoImage(image=pil_image)
         canvas.delete("all")
         
         # Center the image
-        x_pos = (canvas_width - new_width - 4) // 2
-        y_pos = (canvas_height - new_height - 4) // 2
+        x_pos = (canvas_width - new_width) // 2
+        y_pos = (canvas_height - new_height) // 2
         
         canvas.create_image(x_pos, y_pos, anchor=tk.NW, image=photo)
         canvas.image = photo
@@ -1439,52 +1707,22 @@ class ModernFractureDetectionApp:
             anchor='center'
         )
 
-    def display_placeholder(self, canvas, text):
-        """Display placeholder with modern styling"""
-        canvas.delete("all")
-        canvas.update()
-        
-        width = max(canvas.winfo_width(), 400)
-        height = max(canvas.winfo_height(), 400)
-        
-        # Create gradient background effect
-        for i in range(0, height, 20):
-            alpha = 1 - (i / height) * 0.3
-            color_intensity = int(26 + alpha * 10)  # Gradient from dark to slightly lighter
-            color = f"#{color_intensity:02x}{color_intensity + 5:02x}{color_intensity + 10:02x}"
-            canvas.create_rectangle(0, i, width, i + 20, fill=color, outline="")
-        
-        # Add icon and text
-        canvas.create_text(
-            width // 2,
-            height // 2 - 20,
-            text="🖼️",
-            font=('Segoe UI', 24),
-            fill='white',
-            anchor='center'
-        )
-        
-        canvas.create_text(
-            width // 2,
-            height // 2 + 20,
-            text=text,
-            font=('Segoe UI', 12),
-            fill='#A0AEC0',
-            anchor='center'
-        )
-
-    # Prediction methods
+    # Prediction Methods
     def predict_image(self):
-        """Predict fracture with modern progress indication"""
+        """Run Advanced prediction with optional FP Reduction"""
         if not self.current_image_path:
             self.show_error("Please select an image first")
             return
         
         mode = self.current_mode.get()
         
-        if mode == "single":
+        if mode == "sota_fp":
             if not self.model_loaded:
-                self.show_error("Please load a model first")
+                self.show_error("Please load a SOTA model first")
+                return
+        elif mode == "sota":
+            if not self.model_loaded:
+                self.show_error("Please load a SOTA model first")
                 return
         else:  # ensemble
             if not self.ensemble_loaded:
@@ -1492,23 +1730,39 @@ class ModernFractureDetectionApp:
                 return
             
         self.predict_btn.config(state=tk.DISABLED)
-        self.status_var.set("Analyzing X-ray image...")
+        
+        if mode == "sota_fp":
+            self.status_var.set("Running advanced analysis with FP reduction...")
+            analysis_text = "🚀 Running advanced analysis with FP reduction..."
+            color = self.colors['fp_reduction']
+        elif mode == "sota":
+            self.status_var.set("Running SOTA analysis...")
+            analysis_text = "🔬 Running SOTA analysis..."
+            color = self.colors['sota']
+        else:
+            self.status_var.set("Running ensemble analysis...")
+            analysis_text = "🔗 Running ensemble analysis..."
+            color = self.colors['accent']
+            
         self.progress_bar.start(10)
         
         # Update UI to show analysis in progress
-        self.prediction_result_label.config(
-            text="🔄 Analyzing...",
-            fg=self.colors['accent']
-        )
+        self.prediction_result_label.config(text=analysis_text, fg=color)
         
-        if mode == "single":
+        if mode == "sota_fp":
             method = self.method_var.get()
             prediction_thread = threading.Thread(
-                target=self.predict_in_thread,
+                target=self.predict_sota_fp_in_thread,
+                args=(self.current_image_path, method)
+            )
+        elif mode == "sota":
+            method = self.method_var.get()
+            prediction_thread = threading.Thread(
+                target=self.predict_sota_in_thread,
                 args=(self.current_image_path, method)
             )
         else:  # ensemble
-            voting_method = self.voting_var.get()
+            voting_method = "weighted_average"  # Default
             prediction_thread = threading.Thread(
                 target=self.predict_ensemble_in_thread,
                 args=(self.current_image_path, voting_method)
@@ -1517,14 +1771,130 @@ class ModernFractureDetectionApp:
         prediction_thread.daemon = True
         prediction_thread.start()
 
-    def predict_in_thread(self, image_path, method):
-        """Perform prediction in separate thread"""
+    def predict_sota_fp_in_thread(self, image_path, method):
+        """Perform SOTA prediction with FP reduction in separate thread"""
         try:
-            result = self.detector.predict(image_path, method=method)
+            # Read image for analysis
+            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+            if image is None:
+                raise ValueError(f"Cannot read image from {image_path}")
+            
+            # Determine base method and analysis type
+            if "hough_only" in method:
+                # Pure SOTA Hough analysis without CNN
+                if not self.hough_initialized:
+                    raise ValueError("SOTA Hough not initialized")
+                
+                hough_score, hough_heatmap, hough_analysis = self.sota_hough.predict_fracture(image)
+                
+                # Create result structure
+                result = {
+                    'image_path': image_path,
+                    'image': image,
+                    'method': method,
+                    'score': hough_score,
+                    'predicted_label': 1 if hough_score > 0.5 else 0,
+                    'true_label': 1 if "abnormal" in image_path.lower() else 0,
+                    'confidence': hough_analysis['confidence'] * 100,
+                    'heatmap': hough_heatmap,
+                    'processing_time': 2.5,  # Approximate
+                    'hough_analysis': hough_analysis,
+                    'analysis_status': f"SOTA Hough - {hough_analysis['pattern_type']} pattern",
+                    'final_prediction': 1 if hough_score > 0.5 else 0,
+                    'coverage': True
+                }
+                
+            elif "hough" in method:
+                # SOTA Hough + CNN combination
+                if not self.hough_initialized:
+                    raise ValueError("SOTA Hough not initialized")
+                
+                # Get CNN prediction
+                base_method = method.replace('_fp', '').replace('_hough', '_cnn')
+                sota_result = self.sota_detector.predict(image_path, method=base_method)
+                
+                # Get SOTA Hough prediction
+                hough_score, hough_heatmap, hough_analysis = self.sota_hough.predict_fracture(image)
+                
+                # Combine predictions (weighted average)
+                cnn_weight = 0.6
+                hough_weight = 0.4
+                combined_score = cnn_weight * sota_result['score'] + hough_weight * hough_score
+                
+                # Combine heatmaps
+                cnn_heatmap_resized = cv2.resize(sota_result['heatmap'], 
+                                               (hough_heatmap.shape[1], hough_heatmap.shape[0]))
+                combined_heatmap = cnn_weight * cnn_heatmap_resized + hough_weight * hough_heatmap
+                
+                result = {
+                    **sota_result,
+                    'hough_score': hough_score,
+                    'hough_analysis': hough_analysis,
+                    'combined_score': combined_score,
+                    'score': combined_score,
+                    'heatmap': combined_heatmap,
+                    'predicted_label': 1 if combined_score > 0.5 else 0,
+                    'analysis_status': f"SOTA CNN+Hough - {hough_analysis['pattern_type']} pattern"
+                }
+                
+            else:
+                # Standard CNN-based prediction
+                base_method = method.replace('_fp', '')
+                sota_result = self.sota_detector.predict(image_path, method=base_method)
+                result = sota_result
+            
+            # Apply FP reduction if enabled and method includes _fp
+            if self.fp_reduction_enabled.get() and "_fp" in method and self.fp_reducer:
+                img_tensor, _ = self.sota_detector.preprocess_for_cnn(image)
+                
+                # Apply FP reduction
+                fp_result = self.fp_reducer.predict_with_fp_reduction(img_tensor)
+                
+                # Update result with FP reduction
+                result.update({
+                    'fp_prediction': fp_result['prediction'][0],
+                    'fp_confidence': fp_result['confidence'][0],
+                    'fp_calibrated_score': fp_result['calibrated_score'][0],
+                    'fp_high_confidence': fp_result['high_confidence'][0],
+                    'uncertainty': 1 - fp_result['confidence'][0],
+                })
+                
+                # Override prediction if FP reduction suggests uncertainty
+                if fp_result['prediction'][0] == -1:  # Uncertain
+                    result['final_prediction'] = 'uncertain'
+                    result['coverage'] = False
+                    result['analysis_status'] += " - Flagged for Review"
+                else:
+                    result['final_prediction'] = fp_result['prediction'][0]
+                    result['coverage'] = True
+            else:
+                # No FP reduction applied
+                result.update({
+                    'fp_confidence': result['confidence'] / 100,
+                    'fp_calibrated_score': result['score'],
+                    'uncertainty': 1 - (result['confidence'] / 100),
+                    'final_prediction': result['predicted_label'],
+                    'coverage': True
+                })
+                
+                if 'analysis_status' not in result:
+                    result['analysis_status'] = 'Standard Analysis'
+            
             self.prediction_result = result
-            self.master.after(0, self.update_prediction_results, result)
+            self.master.after(0, self.update_sota_fp_results, result)
+            
         except Exception as e:
-            self.master.after(0, self.show_error, f"Prediction error: {str(e)}")
+            self.master.after(0, self.show_error, f"Advanced analysis error: {str(e)}")
+            self.master.after(0, lambda: self.predict_btn.config(state=tk.NORMAL))
+
+    def predict_sota_in_thread(self, image_path, method):
+        """Perform SOTA prediction in separate thread"""
+        try:
+            result = self.sota_detector.predict(image_path, method=method)
+            self.prediction_result = result
+            self.master.after(0, self.update_sota_prediction_results, result)
+        except Exception as e:
+            self.master.after(0, self.show_error, f"SOTA prediction error: {str(e)}")
             self.master.after(0, lambda: self.predict_btn.config(state=tk.NORMAL))
 
     def predict_ensemble_in_thread(self, image_path, voting_method):
@@ -1537,8 +1907,78 @@ class ModernFractureDetectionApp:
             self.master.after(0, self.show_error, f"Ensemble prediction error: {str(e)}")
             self.master.after(0, lambda: self.predict_btn.config(state=tk.NORMAL))
 
+    def update_sota_fp_results(self, result):
+        """Update SOTA + FP Reduction results"""
+        self.progress_bar.stop()
+        
+        # Determine final prediction
+        if result.get('final_prediction') == 'uncertain':
+            self.prediction_result_label.config(
+                text="❓ UNCERTAIN - Requires Expert Review",
+                fg=self.colors['accent']
+            )
+            diagnosis = "uncertain"
+        elif result.get('final_prediction', result['predicted_label']) == 1:
+            self.prediction_result_label.config(
+                text="⚠️ FRACTURE DETECTED (Advanced + FP Reduction)",
+                fg=self.colors['success']
+            )
+            diagnosis = "fracture detected"
+        else:
+            self.prediction_result_label.config(
+                text="✅ NO FRACTURE DETECTED (Advanced + FP Reduction)",
+                fg=self.colors['sota']
+            )
+            diagnosis = "no fracture"
+        
+        # Update confidence metrics
+        fp_confidence = result.get('fp_confidence', result['confidence'] / 100)
+        uncertainty = result.get('uncertainty', 1 - fp_confidence)
+        
+        self.confidence_label.config(text=f"{fp_confidence*100:.1f}%")
+        self.uncertainty_label.config(text=f"{uncertainty*100:.1f}%")
+        self.coverage_label.config(text=result.get('analysis_status', 'N/A'))
+        
+        # Display advanced heatmap
+        self.display_advanced_heatmap(result['image'], result['heatmap'], fp_confidence)
+        
+        # Update status
+        coverage_text = "with coverage" if result.get('coverage', True) else "flagged for review"
+        self.status_var.set(f"Advanced analysis complete: {diagnosis} ({fp_confidence*100:.1f}% confidence) {coverage_text}")
+        self.predict_btn.config(state=tk.NORMAL)
+
+    def update_sota_prediction_results(self, result):
+        """Update SOTA prediction results"""
+        self.progress_bar.stop()
+        
+        # Update prediction label
+        if result['predicted_label'] == 1:
+            self.prediction_result_label.config(
+                text="⚠️ FRACTURE DETECTED (SOTA)",
+                fg=self.colors['success']
+            )
+        else:
+            self.prediction_result_label.config(
+                text="✅ NO FRACTURE DETECTED (SOTA)",
+                fg=self.colors['sota']
+            )
+        
+        # Update confidence
+        confidence = result['confidence'] / 100
+        self.confidence_label.config(text=f"{result['confidence']:.1f}%")
+        self.uncertainty_label.config(text=f"{(1-confidence)*100:.1f}%")
+        self.coverage_label.config(text="Standard Analysis")
+        
+        # Display heatmap
+        self.display_advanced_heatmap(result['image'], result['heatmap'], confidence)
+        
+        # Update status
+        diagnosis = "fracture detected" if result['predicted_label'] == 1 else "no fracture"
+        self.status_var.set(f"SOTA analysis complete: {diagnosis} ({result['confidence']:.1f}% confidence)")
+        self.predict_btn.config(state=tk.NORMAL)
+
     def update_ensemble_results(self, result):
-        """Update ensemble prediction results with modern styling"""
+        """Update ensemble prediction results"""
         self.progress_bar.stop()
         
         # Update prediction label
@@ -1554,78 +1994,21 @@ class ModernFractureDetectionApp:
             )
         
         # Update confidence
-        confidence = result['confidence']
-        self.confidence_label.config(text=f"{confidence:.1f}%")
-        
-        # Update scores - show ensemble score and top individual scores
-        self.cnn_score_label.config(text=f"Ensemble: {result['ensemble_score']:.4f}")
-        
-        # Show best individual model score
-        best_model = max(result['individual_predictions'], key=result['individual_predictions'].get)
-        best_score = result['individual_predictions'][best_model]
-        self.hough_score_label.config(text=f"Best: {best_score:.4f} ({best_model.split('_')[1]})")
+        confidence = result['confidence'] / 100
+        self.confidence_label.config(text=f"{result['confidence']:.1f}%")
+        self.uncertainty_label.config(text=f"{(1-confidence)*100:.1f}%")
+        self.coverage_label.config(text="Ensemble Analysis")
         
         # Display heatmap
-        self.display_heatmap(result['image'], result['heatmap'])
+        self.display_advanced_heatmap(result['image'], result['heatmap'], confidence)
         
         # Update status
         diagnosis = "fracture detected" if result['predicted_label'] == 1 else "no fracture"
-        self.status_var.set(f"Ensemble analysis complete: {diagnosis} ({confidence:.1f}% confidence)")
+        self.status_var.set(f"Ensemble analysis complete: {diagnosis} ({result['confidence']:.1f}% confidence)")
         self.predict_btn.config(state=tk.NORMAL)
-        
-        # Update floating results  
-        self.update_floating_results(result)
-        
-        # Update floating button state
-        self.update_floating_button_state()
 
-    def update_prediction_results(self, result):
-        """Update prediction results with modern styling"""
-        self.progress_bar.stop()
-        
-        # Update prediction label
-        if result['predicted_label'] == 1:
-            self.prediction_result_label.config(
-                text="⚠️ FRACTURE DETECTED",
-                fg=self.colors['success']
-            )
-        else:
-            self.prediction_result_label.config(
-                text="✅ NO FRACTURE DETECTED",
-                fg=self.colors['primary']
-            )
-        
-        # Update confidence with progress bar effect
-        confidence = result['confidence']
-        self.confidence_label.config(text=f"{confidence:.1f}%")
-        
-        # Update scores
-        if result['method'] == 'combined':
-            self.cnn_score_label.config(text=f"{result['cnn_score']:.4f}")
-            self.hough_score_label.config(text=f"{result['hough_score']:.4f}")
-        elif result['method'] == 'cnn':
-            self.cnn_score_label.config(text=f"{result['score']:.4f}")
-            self.hough_score_label.config(text="-")
-        elif result['method'] == 'hough':
-            self.cnn_score_label.config(text="-")
-            self.hough_score_label.config(text=f"{result['score']:.4f}")
-        
-        # Display heatmap
-        self.display_heatmap(result['image'], result['heatmap'])
-        
-        # Update status
-        diagnosis = "fracture detected" if result['predicted_label'] == 1 else "no fracture"
-        self.status_var.set(f"Analysis complete: {diagnosis} ({confidence:.1f}% confidence)")
-        self.predict_btn.config(state=tk.NORMAL)
-        
-        # Update floating results
-        self.update_floating_results(result)
-        
-        # Update floating button state
-        self.update_floating_button_state()
-
-    def display_heatmap(self, original_image, heatmap):
-        """Display heatmap with enhanced visualization"""
+    def display_advanced_heatmap(self, original_image, heatmap, confidence):
+        """Display advanced heatmap with confidence visualization"""
         # Create colored heatmap
         heatmap_colored = cv2.applyColorMap((heatmap * 255).astype(np.uint8), cv2.COLORMAP_JET)
         
@@ -1634,465 +2017,632 @@ class ModernFractureDetectionApp:
         original_bgr = cv2.cvtColor(original_image, cv2.COLOR_GRAY2BGR)
         overlaid = cv2.addWeighted(original_bgr, 1 - alpha, heatmap_colored, alpha, 0)
         
+        # Add confidence visualization border
+        h, w = overlaid.shape[:2]
+        border_thickness = max(5, min(h, w) // 100)
+        
+        # Color based on confidence
+        if confidence > 0.8:
+            border_color = (0, 255, 0)  # Green - high confidence
+        elif confidence > 0.6:
+            border_color = (0, 255, 255)  # Yellow - medium confidence
+        elif confidence > 0.4:
+            border_color = (0, 165, 255)  # Orange - low confidence
+        else:
+            border_color = (0, 0, 255)  # Red - very low confidence
+        
+        # Draw confidence border
+        cv2.rectangle(overlaid, (0, 0), (w-1, h-1), border_color, border_thickness)
+        
+        # Add confidence text overlay
+        font_scale = max(0.5, min(h, w) / 800)
+        font_thickness = max(1, int(font_scale * 2))
+        
+        confidence_text = f"Confidence: {confidence*100:.1f}%"
+        text_size = cv2.getTextSize(confidence_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness)[0]
+        
+        # Position text at top-right corner
+        text_x = w - text_size[0] - 10
+        text_y = 30
+        
+        # Add text background
+        cv2.rectangle(overlaid, (text_x - 5, text_y - 20), 
+                     (text_x + text_size[0] + 5, text_y + 5), 
+                     (0, 0, 0), -1)
+        
+        # Add text
+        cv2.putText(overlaid, confidence_text, (text_x, text_y), 
+                   cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), font_thickness)
+        
         self.display_image(overlaid, self.canvas_heatmap)
 
     def reset_prediction_results(self):
-        """Reset prediction results with modern styling"""
+        """Reset prediction results"""
         self.prediction_result_label.config(
-            text="Awaiting analysis...",
+            text="Awaiting advanced analysis...",
             fg=self.colors['text_secondary']
         )
         self.confidence_label.config(text="-")
-        self.cnn_score_label.config(text="-")
-        self.hough_score_label.config(text="-")
+        self.uncertainty_label.config(text="-")
+        self.coverage_label.config(text="-")
         self.prediction_result = None
 
-    # Enhanced utility methods
-    def save_result(self):
-        """Save prediction results with modern file dialog"""
+    def show_confidence_analysis(self):
+        """Show detailed confidence analysis"""
         if self.prediction_result is None:
-            messagebox.showwarning("Warning", "No results to save!")
-            return
-            
-        save_path = filedialog.asksaveasfilename(
-            title="Save Analysis Results",
-            defaultextension=".png",
-            filetypes=[("PNG files", "*.png"), ("All files", "*.*")]
-        )
-        
-        if save_path:
-            try:
-                mode = self.current_mode.get()
-                
-                if mode == "single":
-                    # Save single model result
-                    fig = self.detector.visualize_result(self.prediction_result)
-                else:
-                    # Save ensemble result
-                    fig = self.ensemble.visualize_ensemble_result(self.prediction_result)
-                
-                fig.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
-                plt.close(fig)
-                self.status_var.set(f"Results saved: {os.path.basename(save_path)}")
-                messagebox.showinfo("Success", f"Results saved successfully!\n{save_path}")
-            except Exception as e:
-                self.show_error(f"Error saving results: {str(e)}")
-
-    def browse_model(self):
-        """Browse for custom model with enhanced dialog"""
-        model_path = filedialog.askopenfilename(
-            title="Select Custom Model",
-            filetypes=[("Model files", "*.h5"), ("All files", "*.*")]
-        )
-        
-        if model_path:
-            self.predict_btn.config(state=tk.DISABLED)
-            self.status_var.set("Loading custom model...")
-            self.model_name_label.config(text="Loading custom model...", fg=self.colors['accent'])
-            self.progress_bar.start(10)
-            
-            self.load_model_thread = threading.Thread(target=self.load_custom_model, args=(model_path,))
-            self.load_model_thread.daemon = True
-            self.load_model_thread.start()
-
-    def load_custom_model(self, model_path):
-        """Load custom model with error handling"""
-        try:
-            self.detector = FractureDetector(model_path)
-            self.model_loaded = True
-            filename = os.path.basename(model_path)
-            parts = filename.split('_')
-            model_type = parts[0] if len(parts) >= 3 else "Custom"
-            region = '_'.join(parts[1:-1]) if len(parts) >= 3 else "Unknown"
-            self.master.after(0, self.update_model_info, model_type, region, model_path)
-        except Exception as e:
-            self.master.after(0, self.show_error, f"Error loading custom model: {str(e)}")
-
-    def evaluate_model(self, method):
-        """Enhanced model evaluation with modern progress"""
-        mode = self.current_mode.get()
-        
-        if mode == "single":
-            if not self.model_loaded:
-                messagebox.showwarning("Warning", "Please load a model first!")
-                return
-        else:  # ensemble
-            if not self.ensemble_loaded:
-                messagebox.showwarning("Warning", "Please initialize ensemble system first!")
-                return
-            
-        test_dir = filedialog.askdirectory(
-            title="Select Test Directory (containing 'normal' and 'abnormal' folders)"
-        )
-        
-        if not test_dir:
-            return
-            
-        # Validate directory structure
-        normal_dir = os.path.join(test_dir, 'normal')
-        abnormal_dir = os.path.join(test_dir, 'abnormal')
-        
-        if not os.path.exists(normal_dir) or not os.path.exists(abnormal_dir):
-            messagebox.showerror(
-                "Invalid Directory",
-                "Selected directory must contain 'normal' and 'abnormal' subdirectories!"
-            )
+            messagebox.showinfo("Info", "No analysis results available!")
             return
         
-        self.predict_btn.config(state=tk.DISABLED)
-        
-        if mode == "single":
-            self.status_var.set(f"Evaluating single model with {method} method...")
-        else:
-            self.status_var.set(f"Evaluating ensemble with {method} voting...")
-            
-        self.progress_bar.start(10)
-        
-        eval_thread = threading.Thread(target=self.evaluate_in_thread, args=(test_dir, method))
-        eval_thread.daemon = True
-        eval_thread.start()
-
-    def evaluate_in_thread(self, test_dir, method):
-        """Perform evaluation in separate thread"""
-        try:
-            mode = self.current_mode.get()
-            
-            if mode == "single":
-                # Single model evaluation
-                output_dir = f"evaluation_results_{method}"
-                results = self.detector.evaluate_on_directory(
-                    test_dir, 
-                    method=method, 
-                    visualize=True, 
-                    output_dir=output_dir
-                )
-            else:
-                # Ensemble evaluation
-                # Get all images from test directory
-                normal_dir = os.path.join(test_dir, 'normal')
-                abnormal_dir = os.path.join(test_dir, 'abnormal')
-                
-                normal_images = [os.path.join(normal_dir, f) for f in os.listdir(normal_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
-                abnormal_images = [os.path.join(abnormal_dir, f) for f in os.listdir(abnormal_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
-                
-                all_images = normal_images + abnormal_images
-                np.random.shuffle(all_images)
-                
-                output_dir = f"ensemble_evaluation_{method}"
-                results = self.ensemble.evaluate_ensemble(
-                    all_images,
-                    voting_methods=[method],
-                    visualize=True,
-                    output_dir=output_dir
-                )
-                
-                # Extract single method result
-                results = results[method]
-            
-            self.master.after(0, self.show_evaluation_results, results, output_dir, method)
-        except Exception as e:
-            self.master.after(0, self.show_error, f"Evaluation error: {str(e)}")
-            self.master.after(0, lambda: self.predict_btn.config(state=tk.NORMAL))
-
-    def show_evaluation_results(self, results, output_dir, method):
-        """Show evaluation results in modern window"""
-        self.progress_bar.stop()
-        
-        mode = self.current_mode.get()
-        title_prefix = "Ensemble" if mode == "ensemble" else "Single Model"
-        
-        # Create modern results window
-        result_window = tk.Toplevel(self.master)
-        result_window.title(f"{title_prefix} Evaluation Results - {method.upper()}")
-        result_window.geometry("900x700")
-        result_window.configure(bg=self.colors['background'])
+        # Create confidence analysis window
+        conf_window = tk.Toplevel(self.master)
+        conf_window.title("📊 Confidence Analysis")
+        conf_window.geometry("800x700")
+        conf_window.configure(bg=self.colors['background'])
         
         # Header
-        header_frame = tk.Frame(result_window, bg=self.colors['primary'], height=60)
+        header_frame = tk.Frame(conf_window, bg=self.colors['confidence'], height=60)
         header_frame.pack(fill=tk.X)
         header_frame.pack_propagate(False)
         
         title_label = tk.Label(
             header_frame,
-            text=f"📊 {title_prefix} Evaluation - {method.upper()}",
+            text="📊 Advanced Confidence Analysis",
             font=('Segoe UI', 16, 'bold'),
-            bg=self.colors['primary'],
+            bg=self.colors['confidence'],
             fg='white'
         )
         title_label.pack(pady=15)
         
-        # Create notebook for results
-        notebook = ttk.Notebook(result_window)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        # Content frame
+        content_frame = tk.Frame(conf_window, bg=self.colors['background'])
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
-        # Metrics tab
-        metrics_frame = tk.Frame(notebook, bg=self.colors['surface'])
-        notebook.add(metrics_frame, text="📈 Metrics")
+        # Create scrollable content
+        canvas = tk.Canvas(content_frame, bg=self.colors['background'])
+        scrollbar = ttk.Scrollbar(content_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg=self.colors['background'])
         
-        # Create metrics display
-        self.create_metrics_display(metrics_frame, results)
-        
-        # Confusion matrix tab (if available)
-        if 'confusion_matrix' in results:
-            cm_frame = tk.Frame(notebook, bg=self.colors['surface'])
-            notebook.add(cm_frame, text="🔄 Confusion Matrix")
-            self.create_confusion_matrix_display(cm_frame, results)
-        
-        # Classification report tab (if available)
-        if 'classification_report' in results:
-            report_frame = tk.Frame(notebook, bg=self.colors['surface'])
-            notebook.add(report_frame, text="📋 Detailed Report")
-            self.create_report_display(report_frame, results, output_dir)
-        
-        # Ensemble details tab (for ensemble mode)
-        if mode == "ensemble" and 'detailed_results' in results:
-            ensemble_frame = tk.Frame(notebook, bg=self.colors['surface'])
-            notebook.add(ensemble_frame, text="🚀 Ensemble Details")
-            self.create_ensemble_details_display(ensemble_frame, results)
-        
-        self.status_var.set(f"{title_prefix} evaluation complete: {method}")
-        self.predict_btn.config(state=tk.NORMAL)
-
-    def create_ensemble_details_display(self, parent, results):
-        """Create ensemble-specific details display"""
-        details_container = tk.Frame(parent, bg=self.colors['surface'])
-        details_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
-        
-        # Ensemble summary
-        summary_frame = tk.LabelFrame(details_container, text="Ensemble Summary", 
-                                    font=('Segoe UI', 12, 'bold'), 
-                                    bg=self.colors['surface'])
-        summary_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        summary_text = f"""
-        Total Models: {len(self.ensemble.models)}
-        Voting Method: {results.get('detailed_results', [{}])[0].get('voting_method', 'N/A')}
-        Total Images Processed: {len(results.get('detailed_results', []))}
-        """
-        
-        summary_label = tk.Label(summary_frame, text=summary_text,
-                               font=('Segoe UI', 10),
-                               bg=self.colors['surface'],
-                               justify=tk.LEFT)
-        summary_label.pack(anchor=tk.W, padx=10, pady=10)
-        
-        # Individual results
-        results_frame = tk.LabelFrame(details_container, text="Individual Results",
-                                    font=('Segoe UI', 12, 'bold'),
-                                    bg=self.colors['surface'])
-        results_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Create scrollable text widget
-        text_frame = tk.Frame(results_frame, bg=self.colors['surface'])
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        text_widget = tk.Text(
-            text_frame,
-            wrap=tk.WORD,
-            font=('Consolas', 9),
-            bg=self.colors['surface'],
-            fg=self.colors['text_primary'],
-            relief='flat'
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
-        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        text_widget.config(yscrollcommand=scrollbar.set)
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
         
-        # Add detailed results
-        if 'detailed_results' in results:
-            for i, result in enumerate(results['detailed_results'][:20]):  # Show first 20 results
-                filename = os.path.basename(result['image_path'])
-                status = "✓" if result['predicted_label'] == result['true_label'] else "✗"
-                
-                detail_text = f"{i+1:3d}. {status} {filename}\n"
-                detail_text += f"     Prediction: {'FRACTURE' if result['predicted_label'] == 1 else 'NORMAL'} "
-                detail_text += f"({result['confidence']:.1f}%)\n"
-                detail_text += f"     Ensemble Score: {result['ensemble_score']:.4f}\n"
-                detail_text += f"     Individual Scores: "
-                
-                # Show top 3 individual model scores
-                sorted_scores = sorted(result['individual_predictions'].items(), 
-                                     key=lambda x: x[1], reverse=True)[:3]
-                score_text = ", ".join([f"{k.split('_')[1]}: {v:.3f}" for k, v in sorted_scores])
-                detail_text += score_text + "\n\n"
-                
-                text_widget.insert(tk.END, detail_text)
+        # Pack canvas and scrollbar
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
         
-        text_widget.config(state=tk.DISABLED)
+        # Add confidence analysis content
+        self.create_confidence_analysis_content(scrollable_frame)
 
-    def create_metrics_display(self, parent, results):
-        """Create modern metrics display"""
-        # Metrics grid
-        metrics_container = tk.Frame(parent, bg=self.colors['surface'])
-        metrics_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+    def create_confidence_analysis_content(self, parent):
+        """Create detailed confidence analysis content"""
+        result = self.prediction_result
+        
+        # Helper function to safely convert to float
+        def safe_float(value, default=0.0):
+            try:
+                if isinstance(value, (np.ndarray, list)):
+                    return float(value[0]) if len(value) > 0 else default
+                elif hasattr(value, 'item'):  # numpy scalar
+                    return float(value.item())
+                else:
+                    return float(value)
+            except (TypeError, ValueError, IndexError):
+                return default
+        
+        # Main prediction card
+        pred_card = self.create_analysis_card(parent, "🎯 Prediction Summary")
+        
+        # Prediction details
+        pred_text = "FRACTURE DETECTED" if result.get('final_prediction', result['predicted_label']) == 1 else "NO FRACTURE"
+        if result.get('final_prediction') == 'uncertain':
+            pred_text = "UNCERTAIN - REQUIRES REVIEW"
+            pred_color = self.colors['accent']
+        elif result.get('final_prediction', result['predicted_label']) == 1:
+            pred_color = self.colors['success']
+        else:
+            pred_color = self.colors['sota']
+        
+        pred_label = tk.Label(pred_card, text=pred_text,
+                            font=('Segoe UI', 16, 'bold'),
+                            bg=self.colors['surface'],
+                            fg=pred_color)
+        pred_label.pack(pady=10)
+        
+        # Confidence metrics
+        conf_card = self.create_analysis_card(parent, "📊 Confidence Metrics")
+        
+        # Safe conversion of confidence values
+        fp_conf = safe_float(result.get('fp_confidence', result['confidence']/100))
+        uncertainty = safe_float(result.get('uncertainty', 1-result['confidence']/100))
+        proc_time = safe_float(result.get('processing_time', 0))
         
         metrics = [
-            ("Accuracy", results['accuracy'], self.colors['primary']),
-            ("Precision", results['precision'], self.colors['accent']),
-            ("Recall", results['recall'], self.colors['secondary']),
-            ("F1 Score", results['f1_score'], self.colors['success'])
+            ("Prediction Confidence", f"{fp_conf*100:.1f}%"),
+            ("Uncertainty", f"{uncertainty*100:.1f}%"),
+            ("Coverage", "Yes" if result.get('coverage', True) else "Flagged for Review"),
+            ("Analysis Method", result.get('method', 'Unknown')),
+            ("Processing Time", f"{proc_time:.2f}s")
         ]
         
-        for i, (name, value, color) in enumerate(metrics):
-            # Create metric card
-            metric_card = tk.Frame(metrics_container, bg=color, relief='flat')
-            metric_card.grid(row=i//2, column=i%2, padx=10, pady=10, sticky='nsew')
+        for metric, value in metrics:
+            metric_frame = tk.Frame(conf_card, bg=self.colors['surface'])
+            metric_frame.pack(fill=tk.X, pady=2)
             
-            # Configure grid weights
-            metrics_container.grid_rowconfigure(i//2, weight=1)
-            metrics_container.grid_columnconfigure(i%2, weight=1)
+            tk.Label(metric_frame, text=f"{metric}:",
+                   font=('Segoe UI', 10),
+                   bg=self.colors['surface'],
+                   fg=self.colors['text_primary']).pack(side=tk.LEFT)
             
-            # Metric content
-            content_frame = tk.Frame(metric_card, bg=color)
-            content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+            tk.Label(metric_frame, text=value,
+                   font=('Segoe UI', 10, 'bold'),
+                   bg=self.colors['surface'],
+                   fg=self.colors['confidence']).pack(side=tk.RIGHT)
+        
+        # FP Reduction details (if available)
+        if 'fp_prediction' in result:
+            fp_card = self.create_analysis_card(parent, "🛡️ False Positive Reduction")
             
-            value_label = tk.Label(
-                content_frame,
-                text=f"{value:.3f}",
-                font=('Segoe UI', 24, 'bold'),
-                bg=color,
-                fg='white'
-            )
-            value_label.pack()
+            fp_pred = result.get('fp_prediction', 'N/A')
+            fp_conf_val = safe_float(result.get('fp_confidence', 0))
+            fp_cal_score = safe_float(result.get('fp_calibrated_score', 0))
             
-            name_label = tk.Label(
-                content_frame,
-                text=name,
-                font=('Segoe UI', 12),
-                bg=color,
-                fg='white'
-            )
-            name_label.pack()
+            fp_metrics = [
+                ("FP Prediction", str(fp_pred)),
+                ("FP Confidence", f"{fp_conf_val*100:.1f}%"),
+                ("Calibrated Score", f"{fp_cal_score:.4f}"),
+                ("High Confidence", "Yes" if result.get('fp_high_confidence', False) else "No")
+            ]
+            
+            for metric, value in fp_metrics:
+                metric_frame = tk.Frame(fp_card, bg=self.colors['surface'])
+                metric_frame.pack(fill=tk.X, pady=2)
+                
+                tk.Label(metric_frame, text=f"{metric}:",
+                       font=('Segoe UI', 10),
+                       bg=self.colors['surface'],
+                       fg=self.colors['text_primary']).pack(side=tk.LEFT)
+                
+                tk.Label(metric_frame, text=value,
+                       font=('Segoe UI', 10, 'bold'),
+                       bg=self.colors['surface'],
+                       fg=self.colors['fp_reduction']).pack(side=tk.RIGHT)
+        
+        # Hough analysis details (if available)
+        if 'hough_analysis' in result:
+            hough_card = self.create_analysis_card(parent, "📐 SOTA Hough Analysis")
+            
+            hough_analysis = result['hough_analysis']
+            
+            frac_score = safe_float(hough_analysis.get('fracture_score', 0))
+            hough_conf = safe_float(hough_analysis.get('confidence', 0))
+            
+            hough_metrics = [
+                ("Fracture Score", f"{frac_score:.4f}"),
+                ("Pattern Type", hough_analysis.get('pattern_type', 'Unknown')),
+                ("Line Count", str(hough_analysis.get('line_count', 0))),
+                ("Analysis Confidence", f"{hough_conf*100:.1f}%")
+            ]
+            
+            for metric, value in hough_metrics:
+                metric_frame = tk.Frame(hough_card, bg=self.colors['surface'])
+                metric_frame.pack(fill=tk.X, pady=2)
+                
+                tk.Label(metric_frame, text=f"{metric}:",
+                       font=('Segoe UI', 10),
+                       bg=self.colors['surface'],
+                       fg=self.colors['text_primary']).pack(side=tk.LEFT)
+                
+                tk.Label(metric_frame, text=value,
+                       font=('Segoe UI', 10, 'bold'),
+                       bg=self.colors['surface'],
+                       fg=self.colors['confidence']).pack(side=tk.RIGHT)
+        
+        # Ground truth comparison
+        gt_card = self.create_analysis_card(parent, "✅ Ground Truth Comparison")
+        
+        true_label = "FRACTURE" if result['true_label'] == 1 else "NORMAL"
+        predicted_label = result.get('final_prediction', result['predicted_label'])
+        
+        if predicted_label == 'uncertain':
+            accuracy_text = "UNCERTAIN - Cannot determine accuracy"
+            accuracy_color = self.colors['accent']
+        else:
+            is_correct = predicted_label == result['true_label']
+            accuracy_text = "CORRECT ✓" if is_correct else "INCORRECT ✗"
+            accuracy_color = self.colors['sota'] if is_correct else self.colors['success']
+        
+        gt_metrics = [
+            ("Ground Truth", true_label),
+            ("Prediction", pred_text),
+            ("Accuracy", accuracy_text)
+        ]
+        
+        for metric, value in gt_metrics:
+            metric_frame = tk.Frame(gt_card, bg=self.colors['surface'])
+            metric_frame.pack(fill=tk.X, pady=2)
+            
+            tk.Label(metric_frame, text=f"{metric}:",
+                   font=('Segoe UI', 10),
+                   bg=self.colors['surface'],
+                   fg=self.colors['text_primary']).pack(side=tk.LEFT)
+            
+            color = accuracy_color if metric == "Accuracy" else self.colors['text_primary']
+            tk.Label(metric_frame, text=value,
+                   font=('Segoe UI', 10, 'bold'),
+                   bg=self.colors['surface'],
+                   fg=color).pack(side=tk.RIGHT)
 
-    def create_confusion_matrix_display(self, parent, results):
-        """Create confusion matrix visualization"""
-        cm_container = tk.Frame(parent, bg=self.colors['surface'])
-        cm_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+    def create_analysis_card(self, parent, title):
+        """Create analysis card for confidence window"""
+        card_container = tk.Frame(parent, bg=self.colors['background'])
+        card_container.pack(fill=tk.X, pady=(0, 15))
         
-        # Create matplotlib figure
-        fig, ax = plt.subplots(figsize=(8, 6))
-        fig.patch.set_facecolor(self.colors['surface'])
+        card = tk.Frame(card_container, bg=self.colors['surface'], relief='flat', bd=1)
+        card.pack(fill=tk.BOTH, expand=True)
         
-        cm = results['confusion_matrix']
-        im = ax.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
-        ax.figure.colorbar(im, ax=ax)
+        # Header
+        header_color = self.colors['confidence']
+        header = tk.Frame(card, bg=header_color, height=35)
+        header.pack(fill=tk.X)
+        header.pack_propagate(False)
         
-        ax.set_title('Confusion Matrix', fontsize=16, fontweight='bold', pad=20)
-        ax.set_xlabel('Predicted Label', fontsize=12)
-        ax.set_ylabel('True Label', fontsize=12)
+        title_label = tk.Label(header, text=title,
+                             font=('Segoe UI', 11, 'bold'),
+                             bg=header_color, fg='white')
+        title_label.pack(side=tk.LEFT, padx=12, pady=8)
         
-        # Set tick labels
-        ax.set_xticks([0, 1])
-        ax.set_yticks([0, 1])
-        ax.set_xticklabels(['Normal', 'Fracture'])
-        ax.set_yticklabels(['Normal', 'Fracture'])
+        # Content
+        content = tk.Frame(card, bg=self.colors['surface'])
+        content.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
         
-        # Add text annotations
-        thresh = cm.max() / 2
-        for i in range(cm.shape[0]):
-            for j in range(cm.shape[1]):
-                ax.text(j, i, format(cm[i, j], 'd'),
-                       ha="center", va="center",
-                       color="white" if cm[i, j] > thresh else "black",
-                       fontsize=14, fontweight='bold')
+        return content
+
+    def save_result(self):
+        """Save Advanced analysis results"""
+        if self.prediction_result is None:
+            messagebox.showwarning("Warning", "No results to save!")
+            return
+            
+        save_path = filedialog.asksaveasfilename(
+            title="Save Advanced Analysis Results",
+            defaultextension=".json",
+            filetypes=[
+                ("JSON files", "*.json"),
+                ("PNG files", "*.png"),
+                ("All files", "*.*")
+            ]
+        )
+        
+        if save_path:
+            try:
+                # Helper function to safely convert to float for JSON serialization
+                def safe_float(value, default=0.0):
+                    try:
+                        if isinstance(value, (np.ndarray, list)):
+                            return float(value[0]) if len(value) > 0 else default
+                        elif hasattr(value, 'item'):  # numpy scalar
+                            return float(value.item())
+                        else:
+                            return float(value)
+                    except (TypeError, ValueError, IndexError):
+                        return default
+                
+                if save_path.endswith('.json'):
+                    # Save as JSON
+                    result_data = {
+                        'timestamp': datetime.now().isoformat(),
+                        'image_path': self.prediction_result['image_path'],
+                        'method': self.prediction_result['method'],
+                        'prediction': {
+                            'score': safe_float(self.prediction_result['score']),
+                            'predicted_label': int(self.prediction_result['predicted_label']),
+                            'confidence': safe_float(self.prediction_result['confidence']),
+                            'final_prediction': self.prediction_result.get('final_prediction', self.prediction_result['predicted_label'])
+                        },
+                        'ground_truth': int(self.prediction_result['true_label']),
+                        'processing_time': safe_float(self.prediction_result['processing_time']),
+                        'fp_reduction': {
+                            'enabled': self.fp_reduction_enabled.get(),
+                            'confidence': safe_float(self.prediction_result.get('fp_confidence', 0)),
+                            'uncertainty': safe_float(self.prediction_result.get('uncertainty', 0)),
+                            'coverage': bool(self.prediction_result.get('coverage', True))
+                        }
+                    }
+                    
+                    # Add Hough analysis if available
+                    if 'hough_analysis' in self.prediction_result:
+                        hough_analysis = self.prediction_result['hough_analysis']
+                        result_data['hough_analysis'] = {
+                            'fracture_score': safe_float(hough_analysis.get('fracture_score', 0)),
+                            'pattern_type': hough_analysis.get('pattern_type', 'Unknown'),
+                            'line_count': int(hough_analysis.get('line_count', 0)),
+                            'confidence': safe_float(hough_analysis.get('confidence', 0))
+                        }
+                    
+                    with open(save_path, 'w', encoding='utf-8') as f:
+                        json.dump(result_data, f, indent=2, ensure_ascii=False)
+                    
+                    self.status_var.set(f"Results saved: {os.path.basename(save_path)}")
+                    messagebox.showinfo("Success", f"Results saved successfully!\n{save_path}")
+                    
+                else:
+                    # Save as image visualization
+                    fig = self.create_advanced_visualization(self.prediction_result)
+                    fig.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
+                    plt.close(fig)
+                    
+                    self.status_var.set(f"Visualization saved: {os.path.basename(save_path)}")
+                    messagebox.showinfo("Success", f"Visualization saved successfully!\n{save_path}")
+                    
+            except Exception as e:
+                self.show_error(f"Error saving results: {str(e)}")
+
+    def create_advanced_visualization(self, result):
+        """Create advanced visualization of results"""
+        # Helper function to safely convert to float
+        def safe_float(value, default=0.0):
+            try:
+                if isinstance(value, (np.ndarray, list)):
+                    return float(value[0]) if len(value) > 0 else default
+                elif hasattr(value, 'item'):  # numpy scalar
+                    return float(value.item())
+                else:
+                    return float(value)
+            except (TypeError, ValueError, IndexError):
+                return default
+        
+        fig = plt.figure(figsize=(16, 12))
+        gs = fig.add_gridspec(3, 3, height_ratios=[2, 1, 1], width_ratios=[1, 1, 1])
+        
+        # Original image
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax1.imshow(result['image'], cmap='gray')
+        ax1.set_title('📷 Original X-ray', fontsize=12, fontweight='bold')
+        ax1.axis('off')
+        
+        # Heatmap
+        ax2 = fig.add_subplot(gs[0, 1])
+        ax2.imshow(result['image'], cmap='gray')
+        heatmap_overlay = ax2.imshow(result['heatmap'], cmap='jet', alpha=0.6)
+        ax2.set_title('🚀 Advanced Analysis Heatmap', fontsize=12, fontweight='bold')
+        ax2.axis('off')
+        
+        # Results summary
+        ax3 = fig.add_subplot(gs[0, 2])
+        ax3.axis('off')
+        
+        # Determine prediction text and color with safe conversion
+        final_pred = result.get('final_prediction', result['predicted_label'])
+        if final_pred == 'uncertain':
+            pred_text = "❓ UNCERTAIN\nREQUIRES REVIEW"
+            pred_color = 'orange'
+        elif final_pred == 1:
+            pred_text = "⚠️ FRACTURE\nDETECTED"
+            pred_color = 'red'
+        else:
+            pred_text = "✅ NO FRACTURE\nDETECTED"
+            pred_color = 'green'
+        
+        true_text = "FRACTURE" if result['true_label'] == 1 else "NORMAL"
+        
+        # Accuracy assessment
+        if final_pred == 'uncertain':
+            accuracy_text = "UNCERTAIN"
+            accuracy_color = 'orange'
+        else:
+            is_correct = final_pred == result['true_label']
+            accuracy_text = "✅ CORRECT" if is_correct else "❌ INCORRECT"
+            accuracy_color = 'green' if is_correct else 'red'
+        
+        # Safe conversions for display
+        fp_conf = safe_float(result.get('fp_confidence', result['confidence']/100))
+        uncertainty = safe_float(result.get('uncertainty', 1-result['confidence']/100))
+        proc_time = safe_float(result['processing_time'])
+        
+        summary_text = f"""
+ADVANCED AI ANALYSIS
+
+Method: {result['method'].upper()}
+Processing: {proc_time:.2f}s
+
+PREDICTION:
+{pred_text}
+
+Confidence: {fp_conf*100:.1f}%
+Uncertainty: {uncertainty*100:.1f}%
+
+GROUND TRUTH:
+{true_text}
+
+RESULT: {accuracy_text}
+
+FP Reduction: {'✅ ENABLED' if result.get('coverage', True) else '⚠️ FLAGGED'}
+        """
+        
+        ax3.text(0.05, 0.95, summary_text, transform=ax3.transAxes, 
+                fontsize=10, verticalalignment='top', fontweight='bold',
+                bbox=dict(boxstyle="round,pad=0.5", facecolor=accuracy_color, alpha=0.1))
+        
+        # Confidence metrics visualization
+        ax4 = fig.add_subplot(gs[1, :])
+        
+        confidence_val = safe_float(result['confidence'])
+        
+        metrics = ['Prediction\nConfidence', 'Uncertainty', 'Model\nConfidence']
+        values = [
+            fp_conf * 100,
+            uncertainty * 100,
+            confidence_val
+        ]
+        colors = [self.colors['confidence'], self.colors['fp_reduction'], self.colors['sota']]
+        
+        bars = ax4.bar(metrics, values, color=[c for c in colors], alpha=0.8)
+        ax4.set_ylabel('Percentage (%)')
+        ax4.set_title('📊 Confidence Metrics', fontsize=12, fontweight='bold')
+        ax4.set_ylim(0, 100)
+        
+        # Add value labels on bars
+        for bar, value in zip(bars, values):
+            ax4.text(bar.get_x() + bar.get_width()/2., bar.get_height() + 1,
+                    f'{value:.1f}%', ha='center', va='bottom', fontweight='bold')
+        
+        # Analysis details
+        ax5 = fig.add_subplot(gs[2, :])
+        ax5.axis('off')
+        
+        # Create analysis details text with safe conversions
+        score_val = safe_float(result['score'])
+        target_spec = safe_float(self.target_specificity.get())
+        
+        details_text = f"""
+DETAILED ANALYSIS REPORT
+
+📍 Image: {os.path.basename(result['image_path'])}
+🔬 Analysis Method: {result['method']}
+⏱️ Processing Time: {proc_time:.2f} seconds
+🎯 Target Specificity: {target_spec:.2f}
+
+📊 PREDICTION DETAILS:
+• Raw Score: {score_val:.4f}
+• Predicted Label: {result['predicted_label']}
+• Final Prediction: {result.get('final_prediction', result['predicted_label'])}
+• Coverage: {'Yes' if result.get('coverage', True) else 'Flagged for Expert Review'}
+
+🛡️ FALSE POSITIVE REDUCTION:
+• Enabled: {'Yes' if self.fp_reduction_enabled.get() else 'No'}
+• FP Confidence: {fp_conf*100:.1f}%
+• Calibrated Score: {safe_float(result.get('fp_calibrated_score', 0)):.4f}
+        """
+        
+        # Add Hough analysis if available
+        if 'hough_analysis' in result:
+            hough = result['hough_analysis']
+            frac_score = safe_float(hough.get('fracture_score', 0))
+            hough_conf = safe_float(hough.get('confidence', 0))
+            
+            details_text += f"""
+
+📐 SOTA HOUGH ANALYSIS:
+• Fracture Score: {frac_score:.4f}
+• Pattern Type: {hough.get('pattern_type', 'Unknown')}
+• Lines Detected: {hough.get('line_count', 0)}
+• Hough Confidence: {hough_conf*100:.1f}%
+        """
+        
+        ax5.text(0.02, 0.98, details_text, transform=ax5.transAxes,
+                fontsize=9, verticalalignment='top', fontfamily='monospace',
+                bbox=dict(boxstyle="round,pad=0.5", facecolor='lightgray', alpha=0.3))
+        
+        # Footer
+        footer_text = f"Advanced AI Fracture Detection System with FP Reduction | Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        fig.text(0.5, 0.02, footer_text, ha='center', fontsize=8, style='italic')
+        
+        plt.suptitle('🚀 Advanced AI Fracture Detection Analysis Report', 
+                    fontsize=14, fontweight='bold', y=0.98)
         
         plt.tight_layout()
-        
-        # Embed in tkinter
-        canvas = FigureCanvasTkAgg(fig, master=cm_container)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-
-    def create_report_display(self, parent, results, output_dir):
-        """Create detailed report display"""
-        report_container = tk.Frame(parent, bg=self.colors['surface'])
-        report_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
-        
-        # Report text
-        text_frame = tk.Frame(report_container, bg=self.colors['surface'])
-        text_frame.pack(fill=tk.BOTH, expand=True)
-        
-        text_widget = tk.Text(
-            text_frame,
-            wrap=tk.WORD,
-            font=('Consolas', 10),
-            bg=self.colors['surface'],
-            fg=self.colors['text_primary'],
-            relief='flat',
-            padx=10,
-            pady=10
-        )
-        text_widget.pack(fill=tk.BOTH, expand=True)
-        
-        # Add scrollbar
-        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        text_widget.config(yscrollcommand=scrollbar.set)
-        
-        # Insert report
-        text_widget.insert(tk.END, results['report'])
-        text_widget.config(state=tk.DISABLED)
-        
-        # Action buttons
-        button_frame = tk.Frame(report_container, bg=self.colors['surface'])
-        button_frame.pack(fill=tk.X, pady=(10, 0))
-        
-        open_folder_btn = tk.Button(
-            button_frame,
-            text="📁 Open Results Folder",
-            font=('Segoe UI', 10, 'bold'),
-            bg=self.colors['accent'],
-            fg='white',
-            activebackground=self.colors['secondary'],
-            relief='flat',
-            pady=8,
-            command=lambda: self.open_folder(output_dir)
-        )
-        open_folder_btn.pack(side=tk.LEFT, padx=(0, 10))
-
-    def open_folder(self, folder_path):
-        """Open folder in file explorer"""
-        try:
-            if os.name == 'nt':  # Windows
-                os.startfile(os.path.abspath(folder_path))
-            else:  # Linux/Mac
-                os.system(f'xdg-open {folder_path}')
-        except Exception as e:
-            self.show_error(f"Cannot open folder: {str(e)}")
+        return fig
 
     def show_error(self, message):
-        """Show modern error dialog"""
+        """Show error dialog"""
         messagebox.showerror("Error", message)
         self.progress_bar.stop()
-
+        
     def show_info(self, title, message):
-        """Show modern info dialog"""
+        """Show info dialog"""
         messagebox.showinfo(title, message)
 
-
 def main():
-    """Main function to run the application"""
+    """Main function to run the Advanced application"""
+    print("🚀" * 30)
+    print("ADVANCED AI FRACTURE DETECTION SYSTEM")
+    print("🚀" * 30)
+    print("🔬 Advanced Features:")
+    print("   ✅ State-of-the-Art CNN Models")
+    print("   ✅ Advanced Hough Transform")
+    print("   ✅ False Positive Reduction")
+    print("   ✅ Uncertainty Quantification")
+    print("   ✅ Confidence Calibration")
+    print("   ✅ Hard Negative Mining")
+    print("   ✅ Ensemble Learning")
+    print("   ✅ Multi-modal Analysis")
+    print("🚀" * 30)
+    
+    # Check for required dependencies
+    missing_deps = []
+    
+    try:
+        import tensorflow as tf
+        print(f"✅ TensorFlow {tf.__version__} available")
+    except ImportError:
+        missing_deps.append("tensorflow")
+    
+    try:
+        import cv2
+        print(f"✅ OpenCV {cv2.__version__} available")
+    except ImportError:
+        missing_deps.append("opencv-python")
+    
+    try:
+        import numpy as np
+        print(f"✅ NumPy {np.__version__} available")
+    except ImportError:
+        missing_deps.append("numpy")
+    
+    try:
+        import matplotlib
+        print(f"✅ Matplotlib {matplotlib.__version__} available")
+    except ImportError:
+        missing_deps.append("matplotlib")
+    
+    try:
+        from PIL import Image
+        print(f"✅ PIL available")
+    except ImportError:
+        missing_deps.append("pillow")
+    
+    if missing_deps:
+        print(f"\n❌ Missing dependencies: {', '.join(missing_deps)}")
+        print("Please install missing dependencies before running the application.")
+        return
+    
     root = tk.Tk()
     
     # Set window icon (optional)
     try:
         # You can add an icon file here
-        # root.iconbitmap('icon.ico')
+        # root.iconbitmap('advanced_icon.ico')
         pass
     except:
         pass
     
-    app = ModernFractureDetectionApp(root)
-    
-    # Center window on screen
-    root.update_idletasks()
-    x = (root.winfo_screenwidth() // 2) - (root.winfo_width() // 2)
-    y = (root.winfo_screenheight() // 2) - (root.winfo_height() // 2)
-    root.geometry(f'+{x}+{y}')
-    
-    root.mainloop()
+    # Initialize the application
+    try:
+        app = AdvancedFractureDetectionApp(root)
+        
+        # Center window on screen
+        root.update_idletasks()
+        x = (root.winfo_screenwidth() // 2) - (root.winfo_width() // 2)
+        y = (root.winfo_screenheight() // 2) - (root.winfo_height() // 2)
+        root.geometry(f'+{x}+{y}')
+        
+        print("\n🎉 Advanced AI Fracture Detection System launched successfully!")
+        print("💡 Tips:")
+        print("   • Load a SOTA model first")
+        print("   • Initialize FP Reduction for enhanced accuracy")
+        print("   • Initialize SOTA Hough for advanced line detection")
+        print("   • Enable FP Reduction in settings for optimal results")
+        print("   • Use SOTA + FP Reduction mode for best performance")
+        
+        root.mainloop()
+        
+    except Exception as e:
+        print(f"\n❌ Error launching application: {str(e)}")
+        print("Please check your installation and try again.")
 
 if __name__ == "__main__":
     main()
