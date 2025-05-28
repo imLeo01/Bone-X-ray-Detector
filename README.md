@@ -26,23 +26,6 @@
 
 ---
 
-## 🎬 Demo & Screenshots
-
-<div align="center">
-
-### 🖼️ Main Interface
-![Main Interface](https://via.placeholder.com/800x500/2E86C1/FFFFFF?text=Advanced+AI+Fracture+Detection+GUI)
-
-### 📊 Analysis Results
-![Analysis Results](https://via.placeholder.com/800x400/28B463/FFFFFF?text=Fracture+Detection+with+Confidence+Heatmap)
-
-### 🎯 Confidence Analysis
-![Confidence Analysis](https://via.placeholder.com/800x400/8E44AD/FFFFFF?text=Uncertainty+Quantification+%26+FP+Reduction)
-
-</div>
-
----
-
 ## 🚀 Quick Start
 
 ### 📋 Prerequisites
@@ -291,23 +274,6 @@ We welcome contributions! Here's how you can help:
 
 ---
 
-## 🏅 Awards & Recognition
-
-<div align="center">
-
-🏆 **Best Medical AI Project 2024**  
-*International Conference on Medical Imaging*
-
-🥇 **Innovation Award**  
-*Healthcare Technology Summit*
-
-⭐ **Top 10 Open Source Medical AI**  
-*GitHub Medical AI Showcase*
-
-</div>
-
----
-
 ## 📖 Citations & References
 
 If you use this work in your research, please cite:
@@ -327,46 +293,6 @@ If you use this work in your research, please cite:
 2. Huang, G., et al. "Densely Connected Convolutional Networks" (2017)
 3. Selvaraju, R.R., et al. "Grad-CAM: Visual Explanations from Deep Networks" (2017)
 4. Recent advances in medical AI uncertainty quantification (2024)
-
----
-
-## 📞 Support & Contact
-
-### 💬 **Community**
-- **Discord**: [Join our community](https://discord.gg/medical-ai)
-- **Discussions**: Use GitHub Discussions for questions
-- **Issues**: Report bugs via GitHub Issues
-
-### 📧 **Professional Support**
-- **Email**: support@ai-fracture-detection.com
-- **Documentation**: [Full docs](https://docs.ai-fracture-detection.com)
-- **Training**: Custom training available
-
-### 🌐 **Social Media**
-- **Twitter**: [@AIFractureDetect](https://twitter.com/aifracturedetect)
-- **LinkedIn**: [Company Page](https://linkedin.com/company/ai-fracture-detection)
-- **YouTube**: [Video Tutorials](https://youtube.com/c/aifracturedetection)
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
-### 🏥 **Medical Disclaimer**
-This software is for research and educational purposes only. It is not intended for clinical diagnosis or treatment decisions. Always consult qualified medical professionals for medical advice.
-
----
-
-<div align="center">
-
-## 🌟 Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/ai-fracture-detection&type=Date)](https://star-history.com/#yourusername/ai-fracture-detection&Date)
-
-### 🙏 **Thank you for your interest in advancing medical AI!**
-
-**Made with ❤️ by the AI Medical Research Community**
 
 ---
 
